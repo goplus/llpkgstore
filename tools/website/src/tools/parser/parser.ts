@@ -1,14 +1,20 @@
 import { VersionData } from './types';
 
-export const titleParser = (data: VersionData, query?: string, page: number = 1, pageSize: number = 10): string[] => {
-    const parsedData = Object.keys(data).filter((key) => {
-        return query ? key.includes(query) : true;
-    });
+export const titleParser = (
+  data?: VersionData,
+  query?: string,
+  page: number = 1,
+  pageSize: number = 10,
+): string[] => {
+  if (!data) return [];
+  const parsedData = Object.keys(data).filter((key) => {
+    return query ? key.includes(query) : true;
+  });
 
-    const startIndex = (page - 1) * pageSize;
-    const endIndex = startIndex + pageSize;
+  const startIndex = (page - 1) * pageSize;
+  const endIndex = startIndex + pageSize;
 
-    return parsedData.slice(startIndex, endIndex);
+  return parsedData.slice(startIndex, endIndex);
 };
 
 export const versionParser = (
