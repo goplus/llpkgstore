@@ -8,7 +8,7 @@ const Header = () => {
         </span>
       </div>
       <a
-        href="./versions.json"
+        href="./llpkgstore.json"
         target="_blank"
         rel="noreferrer"
         className="text-blue-500"
