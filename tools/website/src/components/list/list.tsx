@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import Modal from '../modal';
 import Item from './items';
+import { titleParser, versionParser } from '../../tools/parser/parser';
 
 export interface VersionData {
     [key: string]: {
@@ -43,47 +44,31 @@ const List: React.FC<ListProps> = ({ data, search }) => {
                                 />
                             </div>
                         </div>
-                        {data[name].versions
-                            .filter((ver) => {
-                                let flag = false;
-                                if (convertVersion.trim())
-                                    ver.converted.forEach((con) => {
-                                        if (con.includes(convertVersion.trim())) flag = true;
-                                    });
-                                else flag = true;
-                                return (
-                                    (originVersion.trim() ? ver.original.includes(originVersion.trim()) : true) && flag
-                                );
-                            })
-                            .map((ver, index) => {
-                                return (
-                                    <div key={index} className="flex flex-row gap-4 items-center">
-                                        <span className="font-bold text-lg min-w-16 text-left">{ver.original}</span>
-                                        <span>{ver.converted.join(' / ')}</span>
-                                    </div>
-                                );
-                            })}
+                        {versionParser(data[name], originVersion, convertVersion, 1, 10).map((ver, index) => {
+                            return (
+                                <div key={index} className="flex flex-row gap-4 items-center">
+                                    <span className="font-bold text-lg min-w-16 text-left">{ver.original}</span>
+                                    <span>{ver.converted.join(' / ')}</span>
+                                </div>
+                            );
+                        })}
                     </>
                 )}
             </Modal>
             <div className="flex flex-col gap-4 text-gray-600 px-32 py-16">
                 {data ? (
-                    Object.keys(data)
-                        .filter((keys) => {
-                            return search ? keys.includes(search) : keys;
-                        })
-                        .map((key, index) => {
-                            return (
-                                <Item
-                                    key={key}
-                                    name={key}
-                                    data={data[key]}
-                                    index={index}
-                                    setInfo={setDetailName}
-                                    setModalOpen={setModalOpen}
-                                />
-                            );
-                        })
+                    titleParser(data, search, 1, 10).map((key, index) => {
+                        return (
+                            <Item
+                                key={key}
+                                name={key}
+                                data={data[key]}
+                                index={index}
+                                setInfo={setDetailName}
+                                setModalOpen={setModalOpen}
+                            />
+                        );
+                    })
                 ) : (
                     <p>Loading...</p>
                 )}
