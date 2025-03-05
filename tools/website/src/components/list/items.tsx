@@ -1,44 +1,54 @@
-import { VersionData } from './list';
+import { VersionData } from '../../tools/parser/types'
 
 interface ItemProps {
-    name: string;
-    data: VersionData[string];
-    index: number;
-    setInfo: (data: string) => void;
-    setModalOpen: (open: boolean) => void;
+    name: string
+    data: VersionData[string]
+    index: number
+    setInfo: (data: string) => void
+    setModalOpen: (open: boolean) => void
 }
 
 const Item: React.FC<ItemProps> = ({ name, data, setInfo, setModalOpen }) => {
-    const remain = data.versions.length - 2;
+    const remain = data.versions.length - 2
     return (
-        <div className="bg-white flex flex-row gap-4 items-center border rounded-xl border-gray-300 p-4 min-h-32">
-            <span className="font-bold text-2xl w-32 text-wrap text-gray-900">{name}</span>
+        <div className="flex min-h-32 flex-row items-center gap-4 overflow-clip rounded-xl border border-gray-300 bg-white p-4">
+            <span className="w-32 text-2xl font-bold text-wrap text-gray-900">
+                {name}
+            </span>
             <div className="w-96 text-left">
                 {data.versions
                     .filter((_, index) => {
-                        return index < 2;
+                        return index < 2
                     })
                     .map((ver, index) => {
                         return (
-                            <div key={index} className="flex flex-row gap-4 items-center">
-                                <span className="font-bold text-lg min-w-16 text-left">{ver.original}</span>
-                                <span>{ver.converted.join(' / ')}</span>
+                            <div
+                                key={index}
+                                className="flex flex-row items-center gap-4 text-nowrap overflow-ellipsis"
+                            >
+                                <span className="min-w-16 text-left text-lg font-bold overflow-ellipsis">
+                                    {ver.original}
+                                </span>
+                                <span className="overflow-ellipsis">
+                                    {ver.converted.join(' / ')}
+                                </span>
                             </div>
-                        );
+                        )
                     })}
                 {remain > 0 && (
                     <button
                         onClick={() => {
-                            setInfo(name);
-                            setModalOpen(true);
+                            setInfo(name)
+                            setModalOpen(true)
                         }}
-                        className="text-sky-500 cursor-pointer hover:underline">
+                        className="cursor-pointer text-sky-500 hover:underline"
+                    >
                         And {remain} more...
                     </button>
                 )}
             </div>
         </div>
-    );
-};
+    )
+}
 
-export default Item;
+export default Item
