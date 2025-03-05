@@ -1,24 +1,27 @@
 interface SearchProps {
-    setSearch: (search: string) => void;
+    dataNumber: number
+    setSearch: (search: string) => void
 }
 
-const Search: React.FC<SearchProps> = ({ setSearch }) => {
+const Search: React.FC<SearchProps> = ({ dataNumber, setSearch }) => {
     return (
-        <div className="mb-4 shadow-lg bg-white flex flex-row items-center px-8 justify-center">
-            <span className="text-3xl font-bold absolute left-8">llpkgstore</span>
-            <div className="px-4 py-2 border border-gray-300 rounded-3xl my-4 mx-8 flex items-center gap-2">
+        <div className="flex w-full flex-col items-center bg-gray-100/50 p-6">
+            <div className="mx-8 my-4 flex w-fit items-center gap-2 rounded-xl border border-gray-300 bg-white px-4 py-2">
                 <span className="text-xl font-bold">📦</span>
                 <input
                     onChange={(e) => setSearch(e.target.value)}
-                    className="focus-visible:outline-0"
+                    className="w-96 focus-visible:outline-0"
                     placeholder="Search for a package"
                 />
             </div>
-            <a href="./versions.json" target="_blank" rel="noreferrer" className="text-blue-500">
-                Raw JSON
-            </a>
+            <p>
+                <span className="text-lg font-bold text-blue-700">
+                    {dataNumber}{' '}
+                </span>
+                packages found.
+            </p>
         </div>
-    );
-};
+    )
+}
 
-export default Search;
+export default Search

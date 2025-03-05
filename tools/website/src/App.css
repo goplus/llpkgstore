@@ -1,6 +1,8 @@
+@import "tailwindcss";
+
 #root {
+  @apply bg-gradient-to-br from-blue-100 via-white to-purple-100;
   text-align: center;
-  background-color: #edf7ff;
   min-height: 100vh;
 }
 

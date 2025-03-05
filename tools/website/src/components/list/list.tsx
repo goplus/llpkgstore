@@ -23,7 +23,7 @@ const List: React.FC<ListProps> = ({ data, search }) => {
     return (
         <>
             <DetailModal modalOpen={modalOpen} setModalOpen={setModalOpen} data={data} name={name} />
-            <div className="flex flex-col gap-4 text-gray-600 px-32 py-16">
+            <div className="grid grid-cols-2 gap-4 text-gray-600 px-32 py-16">
                 {data ? (
                     titleParser(data, search, 1, 10).map((key, index) => {
                         return (
