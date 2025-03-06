@@ -7,6 +7,7 @@ export const titleParser = (
     pageSize: number = 10,
 ): { data: string[]; totalCount: number } => {
     if (!data) return { data: [], totalCount: 0 };
+    query = query?.trim();
     const parsedData = Object.keys(data).filter((key) => {
         return query ? key.includes(query) : true;
     });
