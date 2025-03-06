@@ -3,25 +3,28 @@ import { VersionData } from './types';
 export const titleParser = (
     data?: VersionData,
     query?: string,
-    page: number = 1,
+    page: number = 0,
     pageSize: number = 10,
-): string[] => {
-    if (!data) return [];
+): { data: string[]; totalCount: number } => {
+    if (!data) return { data: [], totalCount: 0 };
     const parsedData = Object.keys(data).filter((key) => {
         return query ? key.includes(query) : true;
     });
 
-    const startIndex = (page - 1) * pageSize;
+    const startIndex = page * pageSize;
     const endIndex = startIndex + pageSize;
 
-    return parsedData.slice(startIndex, endIndex);
+    return {
+        data: parsedData.slice(startIndex, endIndex),
+        totalCount: parsedData.length,
+    };
 };
 
 export const versionParser = (
     data: VersionData[string],
     queryOrigin: string = '',
     queryMapped: string = '',
-    page: number = 1,
+    page: number = 0,
     pageSize: number = 10,
 ): VersionData[string]['versions'] => {
     const filteredVersions = data.versions.filter((ver) => {
@@ -38,7 +41,7 @@ export const versionParser = (
         );
     });
 
-    const startIndex = (page - 1) * pageSize;
+    const startIndex = page * pageSize;
     const endIndex = startIndex + pageSize;
 
     return filteredVersions.slice(startIndex, endIndex);

@@ -51,7 +51,7 @@ const DetailModal: React.FC<DetailModalProps> = ({
                         data[name],
                         originVersion,
                         convertVersion,
-                        1,
+                        0,
                         10,
                     ).map((ver, index) => {
                         return (
