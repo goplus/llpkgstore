@@ -22,17 +22,24 @@ const Pagination: React.FC<PaginationProps> = ({
         return itemCount ? Math.ceil(itemCount / pageSize) : 0;
     }, [pageSize, itemCount]);
     return (
-        <ReactPaginate
-            breakLabel="..."
-            activeClassName="text-blue-500"
-            nextLabel="next >"
-            onPageChange={handlePageClick}
-            forcePage={itemOffset}
-            pageRangeDisplayed={5}
-            pageCount={pageCount}
-            previousLabel="< previous"
-            renderOnZeroPageCount={null}
-        />
+        <div className="flex justify-center">
+            <ReactPaginate
+                breakLabel="..."
+                activeLinkClassName="text-white bg-blue-400 hover:bg-blue-400 cursor-default border border-blue-300"
+                className="flex gap-2"
+                pageLinkClassName="cursor-pointer hover:border hover:border-gray-300 min-w-8 min-h-8 flex justify-center items-center rounded-lg"
+                nextLinkClassName="cursor-pointer hover:border hover:border-gray-300 min-w-8 min-h-8 flex justify-center items-center rounded-r-lg"
+                previousLinkClassName="cursor-pointer hover:border hover:border-gray-300 min-w-8 min-h-8 flex justify-center items-center rounded-l-lg"
+                nextLabel=">"
+                disabledLinkClassName="hidden"
+                onPageChange={handlePageClick}
+                forcePage={itemOffset}
+                pageRangeDisplayed={5}
+                pageCount={pageCount}
+                previousLabel="<"
+                renderOnZeroPageCount={null}
+            />
+        </div>
     );
 };
 
