@@ -4,23 +4,18 @@ import List from './components/list/list';
 import Search from './components/search';
 import { titleParser } from './tools/parser/parser';
 import { VersionData } from './tools/parser/types';
+import Pagination from './components/pagination';
 import './App.css';
-import ReactPaginate from 'react-paginate';
 
 function App() {
     const [search, setSearch] = useState('');
     const [data, setData] = useState<VersionData>();
-    const [itemOffset, setItemOffset] = useState(1);
+    const [itemOffset, setItemOffset] = useState(0);
     const pageSize = 4;
     const searchResult = useMemo(
         () => titleParser(data, search, itemOffset, pageSize),
         [data, search, itemOffset],
     );
-    const pageCount = useMemo(() => {
-        return searchResult.totalCount
-            ? Math.ceil(searchResult.totalCount / pageSize)
-            : 0;
-    }, [searchResult]);
     useEffect(() => {
         getVersionData().then((data) => {
             setData(data);
@@ -29,10 +24,6 @@ function App() {
     useEffect(() => {
         setItemOffset(0);
     }, [search]);
-    const handlePageClick = (data: { selected: number }) => {
-        console.log(data.selected);
-        setItemOffset(data.selected);
-    };
     return (
         <>
             <Header />
@@ -43,16 +34,11 @@ function App() {
                 resultNumber={searchResult.totalCount}
             />
             <List data={data} titles={searchResult.data} />
-            <ReactPaginate
-                breakLabel="..."
-                activeClassName="text-blue-500"
-                nextLabel="next >"
-                onPageChange={handlePageClick}
-                forcePage={itemOffset}
-                pageRangeDisplayed={5}
-                pageCount={pageCount}
-                previousLabel="< previous"
-                renderOnZeroPageCount={null}
+            <Pagination
+                itemCount={searchResult.totalCount}
+                pageSize={pageSize}
+                setItemOffset={setItemOffset}
+                itemOffset={itemOffset}
             />
         </>
     );
