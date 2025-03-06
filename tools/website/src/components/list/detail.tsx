@@ -10,34 +10,58 @@ interface DetailModalProps {
     data?: VersionData;
 }
 
-const DetailModal: React.FC<DetailModalProps> = ({ modalOpen, setModalOpen, name, data }) => {
+const DetailModal: React.FC<DetailModalProps> = ({
+    modalOpen,
+    setModalOpen,
+    name,
+    data,
+}) => {
     const [originVersion, setOriginVersion] = useState('');
     const [convertVersion, setConvertVersion] = useState('');
     return (
-        <Modal isOpen={modalOpen} onClose={() => setModalOpen(false)} title={name}>
+        <Modal
+            isOpen={modalOpen}
+            onClose={() => setModalOpen(false)}
+            title={name}
+        >
             {/* <Details /> */}
             {data && name && (
                 <>
-                    <div className="flex flex-row justify-around text-base my-2">
-                        <div className="px-2 py-1 border border-gray-300 rounded-3xl flex items-center gap-2">
+                    <div className="my-2 flex flex-row justify-around text-base">
+                        <div className="flex items-center gap-2 rounded-3xl border border-gray-300 px-2 py-1">
                             <input
-                                onChange={(e) => setOriginVersion(e.target.value)}
-                                className="focus-visible:outline-0 px-1"
+                                onChange={(e) =>
+                                    setOriginVersion(e.target.value)
+                                }
+                                className="px-1 focus-visible:outline-0"
                                 placeholder="Original version"
                             />
                         </div>
-                        <div className="px-2 py-1 border border-gray-300 rounded-3xl flex items-center gap-2">
+                        <div className="flex items-center gap-2 rounded-3xl border border-gray-300 px-2 py-1">
                             <input
-                                onChange={(e) => setConvertVersion(e.target.value)}
-                                className="focus-visible:outline-0 px-1"
+                                onChange={(e) =>
+                                    setConvertVersion(e.target.value)
+                                }
+                                className="px-1 focus-visible:outline-0"
                                 placeholder="Converted version"
                             />
                         </div>
                     </div>
-                    {versionParser(data[name], originVersion, convertVersion, 1, 10).map((ver, index) => {
+                    {versionParser(
+                        data[name],
+                        originVersion,
+                        convertVersion,
+                        1,
+                        10,
+                    ).map((ver, index) => {
                         return (
-                            <div key={index} className="flex flex-row gap-4 items-center">
-                                <span className="font-bold text-lg min-w-16 text-left">{ver.original}</span>
+                            <div
+                                key={index}
+                                className="flex flex-row items-center gap-4"
+                            >
+                                <span className="min-w-16 text-left text-lg font-bold">
+                                    {ver.original}
+                                </span>
                                 <span>{ver.converted.join(' / ')}</span>
                             </div>
                         );
