@@ -5,7 +5,6 @@ interface ModalProps {
     isOpen: boolean;
     onClose: () => void;
     children?: React.ReactNode;
-    title?: string;
     closeButtonClassName?: string;
     contentClassName?: string;
     overlayClassName?: string;
@@ -16,7 +15,6 @@ const Modal: React.FC<ModalProps> = ({
     isOpen,
     onClose,
     children,
-    title,
     closeButtonClassName = '',
     contentClassName = '',
     overlayClassName = '',
@@ -81,36 +79,29 @@ const Modal: React.FC<ModalProps> = ({
             >
                 <div
                     ref={contentRef}
-                    className={`fixed top-1/2 left-1/2 z-50 max-h-[85%] min-h-[50%] w-[90%] max-w-5xl -translate-x-1/2 -translate-y-1/2 transform rounded-xl bg-white p-6 shadow-lg ${contentClassName}`}
+                    className={`fixed top-1/2 left-1/2 z-50 h-[85%] w-[90%] max-w-5xl -translate-x-1/2 -translate-y-1/2 transform rounded-xl bg-white p-6 pt-12 shadow-lg ${contentClassName}`}
                     onClick={(e) => e.stopPropagation()}
                 >
-                    <div className="mb-2 flex items-center justify-between">
-                        <h3 className="text-xl font-semibold">
-                            {title ?? <span className="invisible">Modal</span>}
-                        </h3>
-
-                        <button
-                            className={`absolute top-4 right-4 cursor-pointer rounded-xl p-2 text-gray-500 transition-all duration-300 hover:bg-gray-100 hover:text-gray-700 ${closeButtonClassName}`}
-                            onClick={onClose}
+                    <button
+                        className={`absolute top-2 right-2 cursor-pointer rounded-xl p-2 text-gray-500 transition-all duration-300 hover:bg-gray-100 hover:text-gray-700 ${closeButtonClassName}`}
+                        onClick={onClose}
+                    >
+                        <svg
+                            className="h-6 w-6"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
                         >
-                            <svg
-                                className="h-6 w-6"
-                                fill="none"
-                                stroke="currentColor"
-                                viewBox="0 0 24 24"
-                            >
-                                <path
-                                    strokeLinecap="round"
-                                    strokeLinejoin="round"
-                                    strokeWidth={2}
-                                    d="M6 18L18 6M6 6l12 12"
-                                />
-                            </svg>
-                        </button>
-                    </div>
-                    <div className="max-h-[80vh] overflow-y-auto">
-                        {children}
-                    </div>
+                            <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={2}
+                                d="M6 18L18 6M6 6l12 12"
+                            />
+                        </svg>
+                    </button>
+
+                    <div className="h-full overflow-auto">{children}</div>
                 </div>
             </CSSTransition>
         </>

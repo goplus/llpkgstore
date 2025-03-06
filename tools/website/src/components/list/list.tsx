@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import Item from './items';
 import { VersionData } from '../../tools/parser/types';
-import DetailModal from './detail';
+import DetailModal from '../detail/detail';
 
 interface ListProps {
     data?: VersionData;
