@@ -12,9 +12,9 @@ const Search: React.FC<SearchProps> = ({
     setSearch,
 }) => {
     return (
-        <div className="flex w-full flex-col items-center bg-gray-100/50 p-6">
+        <div className="flex w-full flex-col items-center p-6">
             <div className="mx-2 my-4 flex w-full items-center gap-2 rounded-xl border border-gray-300 bg-white px-4 py-2 sm:mx-8 md:w-fit">
-                <span className="text-xl font-bold">📦</span>
+                <span className="text-xl font-bold select-none">📦</span>
                 <input
                     onChange={(e) => setSearch(e.target.value)}
                     className="w-full focus-visible:outline-0 md:w-96"

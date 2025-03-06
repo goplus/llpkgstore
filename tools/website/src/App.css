@@ -4,6 +4,7 @@
     @apply bg-gradient-to-br from-blue-100 via-white to-purple-100;
     text-align: center;
     min-height: 100vh;
+    
 }
 
 .logo {

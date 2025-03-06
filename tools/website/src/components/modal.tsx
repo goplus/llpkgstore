@@ -1,4 +1,4 @@
-import { useRef } from 'react';
+import { useEffect, useRef } from 'react';
 import { CSSTransition } from 'react-transition-group';
 
 interface ModalProps {
@@ -9,6 +9,7 @@ interface ModalProps {
     closeButtonClassName?: string;
     contentClassName?: string;
     overlayClassName?: string;
+    disableEscClose?: boolean;
 }
 
 const Modal: React.FC<ModalProps> = ({
@@ -19,6 +20,7 @@ const Modal: React.FC<ModalProps> = ({
     closeButtonClassName = '',
     contentClassName = '',
     overlayClassName = '',
+    disableEscClose = false,
 }) => {
     const overlayRef = useRef<HTMLDivElement>(null);
     const contentRef = useRef<HTMLDivElement>(null);
@@ -26,7 +28,23 @@ const Modal: React.FC<ModalProps> = ({
     const handleOverlayClick = (e: React.MouseEvent) => {
         if (e.target === e.currentTarget) onClose();
     };
+    useEffect(() => {
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if (e.key === 'Escape' && !disableEscClose) {
+                onClose();
+            }
+        };
 
+        if (isOpen) {
+            document.addEventListener('keydown', handleKeyDown);
+        } else {
+            document.removeEventListener('keydown', handleKeyDown);
+        }
+
+        return () => {
+            document.removeEventListener('keydown', handleKeyDown);
+        };
+    }, [isOpen, disableEscClose, onClose]);
     return (
         <>
             <CSSTransition
@@ -63,13 +81,14 @@ const Modal: React.FC<ModalProps> = ({
             >
                 <div
                     ref={contentRef}
-                    className={`fixed top-1/2 left-1/2 z-50 w-full max-w-lg -translate-x-1/2 -translate-y-1/2 transform rounded-xl bg-white p-6 shadow-lg ${contentClassName}`}
+                    className={`fixed top-1/2 left-1/2 z-50 max-h-[85%] min-h-[50%] w-[90%] max-w-5xl -translate-x-1/2 -translate-y-1/2 transform rounded-xl bg-white p-6 shadow-lg ${contentClassName}`}
                     onClick={(e) => e.stopPropagation()}
                 >
-                    <div className="mb-4 flex items-center justify-between">
-                        {title && (
-                            <h3 className="text-xl font-semibold">{title}</h3>
-                        )}
+                    <div className="mb-2 flex items-center justify-between">
+                        <h3 className="text-xl font-semibold">
+                            {title ?? <span className="invisible">Modal</span>}
+                        </h3>
+
                         <button
                             className={`absolute top-4 right-4 cursor-pointer rounded-xl p-2 text-gray-500 transition-all duration-300 hover:bg-gray-100 hover:text-gray-700 ${closeButtonClassName}`}
                             onClick={onClose}

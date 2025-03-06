@@ -1,5 +1,5 @@
 {
-    "cgood": {
+    "cjson": {
         "versions": [
             {
                 "original": "1.3",
@@ -11,7 +11,7 @@
             }
         ]
     },
-    "goodlib": {
+    "zlib": {
         "versions": [
             {
                 "original": "11.4",
@@ -27,7 +27,7 @@
             }
         ]
     },
-    "goodjson": {
+    "pkgconf": {
         "versions": [
             {
                 "original": "1.7.16",
@@ -75,7 +75,7 @@
             }
         ]
     },
-    "ctest": {
+    "cmake": {
         "versions": [
             {
                 "original": "0.2.3",

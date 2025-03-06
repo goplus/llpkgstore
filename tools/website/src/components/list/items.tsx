@@ -12,9 +12,15 @@ const Item: React.FC<ItemProps> = ({ name, data, setInfo, setModalOpen }) => {
     const remain = data.versions.length - 2;
     return (
         <div className="flex min-h-32 flex-row items-center gap-4 overflow-clip rounded-xl border border-gray-300 bg-white p-4">
-            <span className="w-32 text-2xl font-bold text-wrap text-gray-900">
+            <a
+                className="w-32 cursor-pointer text-2xl font-bold text-wrap text-gray-900 hover:underline"
+                onClick={() => {
+                    setInfo(name);
+                    setModalOpen(true);
+                }}
+            >
                 {name}
-            </span>
+            </a>
             <div className="w-96 text-left">
                 {data.versions
                     .filter((_, index) => {
@@ -37,7 +43,8 @@ const Item: React.FC<ItemProps> = ({ name, data, setInfo, setModalOpen }) => {
                     })}
                 {remain > 0 && (
                     <button
-                        onClick={() => {
+                        onClick={(e) => {
+                            e.stopPropagation();
                             setInfo(name);
                             setModalOpen(true);
                         }}

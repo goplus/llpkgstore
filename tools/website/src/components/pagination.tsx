@@ -22,7 +22,7 @@ const Pagination: React.FC<PaginationProps> = ({
         return itemCount ? Math.ceil(itemCount / pageSize) : 0;
     }, [pageSize, itemCount]);
     return (
-        <div className="flex justify-center">
+        <div className="flex justify-center pb-6">
             <ReactPaginate
                 breakLabel="..."
                 activeLinkClassName="text-white bg-blue-400 hover:bg-blue-400 cursor-default border border-blue-300"
