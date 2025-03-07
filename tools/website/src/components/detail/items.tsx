@@ -21,7 +21,7 @@ const VersionItem: React.FC<VersionItemProps> = ({ ver, setVersion }) => {
                         />
                     ))}
                 </span>
-                <span className="ml-auto">
+                <span className="ml-auto min-w-20 border-l border-gray-300 pl-2">
                     <VersionTag
                         tag={ver.go[ver.go.length - 1]}
                         onClick={setVersion}

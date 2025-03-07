@@ -27,6 +27,7 @@ export const versionParser = (
     queryMapped: string = '',
     page: number = 0,
     pageSize: number = 10,
+    descending: boolean = false,
 ): VersionData[string]['versions'] => {
     const filteredVersions = data.versions.filter((ver) => {
         let flag = false;
@@ -40,6 +41,10 @@ export const versionParser = (
             flag
         );
     });
+
+    if (descending) {
+        filteredVersions.reverse();
+    }
 
     const startIndex = page * pageSize;
     const endIndex = startIndex + pageSize;

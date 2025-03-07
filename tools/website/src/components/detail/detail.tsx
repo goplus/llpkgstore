@@ -4,6 +4,8 @@ import { versionParser } from '../../tools/parser/parser';
 import Modal from '../modal';
 import Title from './title';
 import VersionItem from './items';
+import AscendingImg from '../../assets/sortAscending.svg';
+import DescendingImg from '../../assets/sortDescending.svg';
 
 interface DetailModalProps {
     modalOpen: boolean;
@@ -20,10 +22,12 @@ const DetailModal: React.FC<DetailModalProps> = ({
 }) => {
     const [originVersion, setOriginVersion] = useState('');
     const [mappedVersion, setMappedVersion] = useState('');
+    const [desc, setDesc] = useState(false);
     const [version, setVersion] = useState('latest');
 
     useEffect(() => {
         setVersion('latest');
+        setDesc(false);
     }, [name]);
     return (
         <Modal isOpen={modalOpen} onClose={() => setModalOpen(false)}>
@@ -32,8 +36,8 @@ const DetailModal: React.FC<DetailModalProps> = ({
                 <div className="relative h-full overflow-auto px-4 pb-3">
                     {data && name && (
                         <>
-                            <div className="sticky top-1 mt-5 mb-2 flex flex-row justify-around text-base">
-                                <div className="mb-4 flex items-center gap-2 rounded-lg border border-gray-300 bg-white/70 px-2 backdrop-blur-lg">
+                            <div className="sticky top-1 mt-5 mb-1 flex flex-row justify-around text-base">
+                                <div className="mb-2 flex items-center gap-2 rounded-lg border border-gray-300 bg-white/70 px-2 backdrop-blur-lg">
                                     <input
                                         onChange={(e) =>
                                             setOriginVersion(e.target.value)
@@ -50,6 +54,22 @@ const DetailModal: React.FC<DetailModalProps> = ({
                                     />
                                 </div>
                             </div>
+                            <div className="mb-3 text-right">
+                                <button
+                                    className="cursor-pointer text-sm"
+                                    onClick={() => setDesc(!desc)}
+                                >
+                                    <img
+                                        src={
+                                            desc ? DescendingImg : AscendingImg
+                                        }
+                                        className="inline-block w-3 align-middle"
+                                    />
+                                    <span className="align-middle">
+                                        {desc ? 'Descending' : 'Ascending'}
+                                    </span>
+                                </button>
+                            </div>
                             <div className="flex flex-col gap-2">
                                 {versionParser(
                                     data[name],
@@ -57,6 +77,7 @@ const DetailModal: React.FC<DetailModalProps> = ({
                                     mappedVersion,
                                     0,
                                     10,
+                                    desc,
                                 ).map((ver, index) => {
                                     return (
                                         <VersionItem
