@@ -39,6 +39,7 @@ function App() {
                 pageSize={pageSize}
                 setItemOffset={setItemOffset}
                 itemOffset={itemOffset}
+                className="pb-6"
             />
         </>
     );
