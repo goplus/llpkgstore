@@ -33,10 +33,10 @@ const Item: React.FC<ItemProps> = ({ name, data, setInfo, setModalOpen }) => {
                                 className="flex flex-row items-center gap-4 text-nowrap overflow-ellipsis"
                             >
                                 <span className="min-w-16 text-left text-lg font-bold overflow-ellipsis">
-                                    {ver.original}
+                                    {ver.c}
                                 </span>
                                 <span className="overflow-ellipsis">
-                                    {ver.converted.join(' / ')}
+                                    {ver.go.join(' / ')}
                                 </span>
                             </div>
                         );

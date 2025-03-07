@@ -9,12 +9,24 @@ const VersionItem: React.FC<VersionItemProps> = ({ ver, setVersion }) => {
     return (
         <div className="flex flex-row items-center gap-4 rounded-lg bg-gray-50 px-4 py-3">
             <span className="min-w-16 text-left text-lg font-bold">
-                {ver.original}
+                {ver.c}
             </span>
-            <div className="flex flex-row gap-2">
-                {ver.converted.map((ver, index) => (
-                    <VersionTag key={index} tag={ver} onClick={setVersion} />
-                ))}
+            <div className="flex w-full flex-row gap-2 overflow-hidden">
+                <span className="flex w-full flex-row flex-nowrap gap-2 overflow-auto">
+                    {ver.go.map((ver, index) => (
+                        <VersionTag
+                            key={index}
+                            tag={ver}
+                            onClick={setVersion}
+                        />
+                    ))}
+                </span>
+                <span className="ml-auto">
+                    <VersionTag
+                        tag={ver.go[ver.go.length - 1]}
+                        onClick={setVersion}
+                    />
+                </span>
             </div>
         </div>
     );

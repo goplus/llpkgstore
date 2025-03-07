@@ -31,14 +31,13 @@ export const versionParser = (
     const filteredVersions = data.versions.filter((ver) => {
         let flag = false;
         if (queryMapped.trim())
-            ver.converted.forEach((con) => {
+            ver.go.forEach((con) => {
                 if (con.includes(queryMapped.trim())) flag = true;
             });
         else flag = true;
         return (
-            (queryOrigin.trim()
-                ? ver.original.includes(queryOrigin.trim())
-                : true) && flag
+            (queryOrigin.trim() ? ver.c.includes(queryOrigin.trim()) : true) &&
+            flag
         );
     });
 
