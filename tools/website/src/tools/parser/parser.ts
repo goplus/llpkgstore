@@ -28,7 +28,7 @@ export const versionParser = (
     page: number = 0,
     pageSize: number = 10,
     descending: boolean = false,
-): VersionData[string]['versions'] => {
+): { data: VersionData[string]['versions']; totalCount: number } => {
     const filteredVersions = data.versions.filter((ver) => {
         let flag = false;
         if (queryMapped.trim())
@@ -49,5 +49,8 @@ export const versionParser = (
     const startIndex = page * pageSize;
     const endIndex = startIndex + pageSize;
 
-    return filteredVersions.slice(startIndex, endIndex);
+    return {
+        data: filteredVersions.slice(startIndex, endIndex),
+        totalCount: filteredVersions.length,
+    };
 };

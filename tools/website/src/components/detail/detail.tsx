@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { VersionData } from '../../tools/parser/types';
 import { versionParser } from '../../tools/parser/parser';
 import Modal from '../modal';
@@ -6,6 +6,7 @@ import Title from './title';
 import VersionItem from './items';
 import AscendingImg from '../../assets/sortAscending.svg';
 import DescendingImg from '../../assets/sortDescending.svg';
+import Pagination from '../pagination';
 
 interface DetailModalProps {
     modalOpen: boolean;
@@ -22,19 +23,38 @@ const DetailModal: React.FC<DetailModalProps> = ({
 }) => {
     const [originVersion, setOriginVersion] = useState('');
     const [mappedVersion, setMappedVersion] = useState('');
+    const [itemOffset, setItemOffset] = useState(0);
     const [desc, setDesc] = useState(false);
     const [version, setVersion] = useState('latest');
+    const pageSize = 5;
+    const searchResult = useMemo(
+        () =>
+            data &&
+            name &&
+            versionParser(
+                data[name],
+                originVersion,
+                mappedVersion,
+                itemOffset,
+                pageSize,
+                desc,
+            ),
+        [data, originVersion, mappedVersion, desc, name, itemOffset],
+    );
 
     useEffect(() => {
         setVersion('latest');
         setDesc(false);
     }, [name]);
+    useEffect(() => {
+        setItemOffset(0);
+    }, [originVersion, mappedVersion]);
     return (
         <Modal isOpen={modalOpen} onClose={() => setModalOpen(false)}>
             <div className="flex h-full flex-col">
                 <Title name={name} version={version} setVersion={setVersion} />
                 <div className="relative h-full overflow-auto px-4 pb-3">
-                    {data && name && (
+                    {searchResult ? (
                         <>
                             <div className="sticky top-1 mt-5 mb-1 flex flex-row justify-around text-base">
                                 <div className="mb-2 flex items-center gap-2 rounded-lg border border-gray-300 bg-white/70 px-2 backdrop-blur-lg">
@@ -71,14 +91,7 @@ const DetailModal: React.FC<DetailModalProps> = ({
                                 </button>
                             </div>
                             <div className="flex flex-col gap-2">
-                                {versionParser(
-                                    data[name],
-                                    originVersion,
-                                    mappedVersion,
-                                    0,
-                                    10,
-                                    desc,
-                                ).map((ver, index) => {
+                                {searchResult.data.map((ver, index) => {
                                     return (
                                         <VersionItem
                                             key={index}
@@ -88,7 +101,19 @@ const DetailModal: React.FC<DetailModalProps> = ({
                                     );
                                 })}
                             </div>
+                            <Pagination
+                                className="mt-3"
+                                setItemOffset={setItemOffset}
+                                itemOffset={itemOffset}
+                                itemCount={searchResult.totalCount}
+                                pageSize={pageSize}
+                            />
+                            {searchResult.totalCount === 0 && (
+                                <p>No results.</p>
+                            )}
                         </>
+                    ) : (
+                        <p>No data.</p>
                     )}
                 </div>
             </div>

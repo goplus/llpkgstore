@@ -19,9 +19,9 @@ const List: React.FC<ListProps> = ({ data, titles }) => {
                 data={data}
                 name={name}
             />
-            <div className="grid grid-cols-1 gap-4 px-8 py-16 text-gray-600 md:px-32 lg:grid-cols-2">
-                {data ? (
-                    titles.map((key, index) => {
+            {data ? (
+                <div className="grid grid-cols-1 gap-4 px-8 py-16 text-gray-600 md:px-32 lg:grid-cols-2">
+                    {titles.map((key, index) => {
                         return (
                             <Item
                                 key={key}
@@ -32,11 +32,11 @@ const List: React.FC<ListProps> = ({ data, titles }) => {
                                 setModalOpen={setModalOpen}
                             />
                         );
-                    })
-                ) : (
-                    <p>Loading...</p>
-                )}
-            </div>
+                    })}
+                </div>
+            ) : (
+                <p>Loading...</p>
+            )}
         </>
     );
 };
