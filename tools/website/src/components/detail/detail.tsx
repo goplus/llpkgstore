@@ -32,7 +32,7 @@ const DetailModal: React.FC<DetailModalProps> = ({
     return (
         <Modal isOpen={modalOpen} onClose={() => setModalOpen(false)}>
             <div className="flex h-full flex-col">
-                <Title name={name} version={version} />
+                <Title name={name} version={version} setVersion={setVersion} />
                 <div className="relative h-full overflow-auto px-4 pb-3">
                     {data && name && (
                         <>
@@ -56,7 +56,7 @@ const DetailModal: React.FC<DetailModalProps> = ({
                             </div>
                             <div className="mb-3 text-right">
                                 <button
-                                    className="cursor-pointer text-sm"
+                                    className="cursor-pointer text-sm text-gray-500"
                                     onClick={() => setDesc(!desc)}
                                 >
                                     <img

@@ -79,7 +79,7 @@ const Modal: React.FC<ModalProps> = ({
             >
                 <div
                     ref={contentRef}
-                    className={`fixed top-1/2 left-1/2 z-50 h-[85%] w-[90%] max-w-5xl -translate-x-1/2 -translate-y-1/2 transform rounded-xl bg-white p-6 pt-12 shadow-lg ${contentClassName}`}
+                    className={`fixed top-1/2 left-1/2 z-50 h-[85%] w-[90%] max-w-5xl -translate-x-1/2 -translate-y-1/2 transform rounded-lg bg-white p-6 pt-12 shadow-lg ${contentClassName}`}
                     onClick={(e) => e.stopPropagation()}
                 >
                     <button
