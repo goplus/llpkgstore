@@ -22,7 +22,7 @@ const Title: React.FC<TitleProps> = ({ name, version, setVersion }) => {
                 <h1 className="text-3xl font-bold">{name}</h1>
                 <a
                     className="text-xs font-light text-gray-400"
-                    href={`https://github.com/goplus/llpkg/{name}`}
+                    href={`https://github.com/goplus/llpkg/${name}`}
                     target="_blank"
                     rel="noreferrer"
                 >
