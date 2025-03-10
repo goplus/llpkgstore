@@ -1,7 +1,7 @@
 package cmd
 
 import (
-	"github.com/goplus/llpkg/tools/pkg/actions"
+	"github.com/goplus/llpkgstore/tools/pkg/actions"
 	"github.com/spf13/cobra"
 )
 

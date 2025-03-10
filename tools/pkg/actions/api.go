@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/google/go-github/v69/github"
-	"github.com/goplus/llpkg/tools/pkg/config"
+	"github.com/goplus/llpkgstore/tools/pkg/config"
 )
 
 // format: Release-as: clib/semver(with v prefix)

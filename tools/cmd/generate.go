@@ -5,8 +5,8 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/goplus/llpkg/tools/pkg/actions/generator/llcppg"
-	"github.com/goplus/llpkg/tools/pkg/config"
+	"github.com/goplus/llpkgstore/tools/pkg/actions/generator/llcppg"
+	"github.com/goplus/llpkgstore/tools/pkg/config"
 	"github.com/spf13/cobra"
 )
 
@@ -43,8 +43,12 @@ func runLLCppgGenerateWithDir(dir string) {
 	// we have to feed the pc to llcppg
 	os.Setenv("PKG_CONFIG_PATH", dir)
 
-	err = llcppg.New(dir).Generate()
-	if err != nil {
+	generator := llcppg.New(dir)
+
+	if err := generator.Generate(); err != nil {
+		log.Fatal(err)
+	}
+	if err := generator.Check(); err != nil {
 		log.Fatal(err)
 	}
 }
