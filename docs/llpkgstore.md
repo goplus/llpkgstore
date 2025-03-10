@@ -379,7 +379,7 @@ We have to consider about the module regenerating due to generator upgrading, he
 ### PR verification workflow
 1. Ensure that there is only one `llpkg.cfg` file across all directories. If multiple instances of `llpkg.cfg` are detected, the PR will be aborted.  
 2. Check if the directory name is valid, the directory name in PR **SHOULD** equal to `Package.Name` field in the `llpkg.cfg` file.
-3. Check at least one commit contains [`{MappedVersion}`](#mappedversion-in-pr-commit) in the PR.
+3. Check the PR commit footer contains a [`{MappedVersion}`](#mappedversion-in-pr-commit).
 
 ### llpkg generation
 
@@ -396,9 +396,9 @@ The maintainer **SHOULD** squash commits before merging a PR. The squash commit 
 #### `{MappedVersion}` in PR Commit  
 The `{MappedVersion}` **MUST** be included in at least one of the commits in the PR and **MUST** follow this format:  
 
-```  
-Release-as: {CLibraryName}/{MappedVersion}  
-```  
+```
+Release-as: {CLibraryName}/{MappedVersion}
+```
 
 The PR verification process will validate this format and abort the PR if it is invalid.
 
