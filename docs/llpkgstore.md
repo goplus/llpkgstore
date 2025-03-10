@@ -416,7 +416,7 @@ The Post-processing GitHub Action will tag the commit according to the [Version 
 1. Extract the `{MappedVersion}` of the current package from the footer of the squashed commit.  
 2. Follow Go's version management for nested modules and tag `{CLibraryName}/{MappedVersion}` for each version.  
 3. This design is fully compatible with native Go modules:  
-    ```  
+    ```
     github.com/goplus/llpkg/cjson@v1.7.18
     ```
 
