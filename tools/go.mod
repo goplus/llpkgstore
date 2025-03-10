@@ -1,4 +1,4 @@
-module github.com/goplus/llpkg/tools
+module github.com/goplus/llpkgstore/tools
 
 go 1.23
 

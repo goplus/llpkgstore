@@ -5,8 +5,8 @@ import (
 	"os/exec"
 	"strings"
 
-	"github.com/goplus/llpkg/tools/internal/cmdbuilder"
-	"github.com/goplus/llpkg/tools/pkg/upstream"
+	"github.com/goplus/llpkgstore/tools/internal/cmdbuilder"
+	"github.com/goplus/llpkgstore/tools/pkg/upstream"
 )
 
 const (
