@@ -379,7 +379,7 @@ We have to consider about the module regenerating due to generator upgrading, he
 ### PR verification workflow
 1. Ensure that there is only one `llpkg.cfg` file across all directories. If multiple instances of `llpkg.cfg` are detected, the PR will be aborted.  
 2. Check if the directory name is valid, the directory name in PR **SHOULD** equal to `Package.Name` field in the `llpkg.cfg` file.
-3. Check the PR commit footer contains a {MappedVersion}.
+3. Check at least one commit contains [`{MappedVersion}`](#mappedversion-in-pr-commit) in the PR.
 
 ### llpkg generation
 
@@ -390,33 +390,35 @@ A standard method for generating valid llpkgs:
 4. Combine generated results into one Go module
 5. Debug and re-generate llpkg by modifying the configuration file
 
-### Version tag rule
-1. Parse the `{MappedVersion}` of current package from PR commit footer
-2. Follow Go's version management for nested modules. Tag `{CLibraryName}/{MappedVersion}` for each version.
-3. This design is fully compatible with native Go modules
-    ```
-    github.com/goplus/llpkg/cjson@v1.7.18
-    ```
+### Merge PR  
+The maintainer **SHOULD** squash commits before merging a PR. The squash commit message **MUST** include [`{MappedVersion}`](#mappedversion-in-pr-commit) to enable the Post-processing GitHub Action to parse it correctly.
 
-### `{MappedVersion}` in PR commit
-`{MappedVersion}` **MUST** be included in the PR's latest commit, and **MUST** follow the format:  
+#### `{MappedVersion}` in PR Commit  
+The `{MappedVersion}` **MUST** be included in at least one of the commits in the PR and **MUST** follow this format:  
 
-```
-Release-as: {CLibraryName}/{MappedVersion}
+```  
+Release-as: {CLibraryName}/{MappedVersion}  
 ```  
 
 The PR verification process will validate this format and abort the PR if it is invalid.
 
-Example:
+**Example:**  
 ```bash
 git merge
-# modify merge commit message
+# Modify the merge commit message
 git commit --amend -m "feat: add cjson" -m "Release-as: cjson/v1.0.0"
 ```
 
-### Post-processing Github Action
+### Post-processing GitHub Action  
+The Post-processing GitHub Action will tag the commit according to the [Version Tag Rule](#version-tag-rule).
 
-Post-processing GitHub Action will tag the commit following the [Version Tag Rule](#version-tag-rule).
+#### Version Tag Rule  
+1. Extract the `{MappedVersion}` of the current package from the footer of the squashed commit.  
+2. Follow Go's version management for nested modules and tag `{CLibraryName}/{MappedVersion}` for each version.  
+3. This design is fully compatible with native Go modules:  
+    ```  
+    github.com/goplus/llpkg/cjson@v1.7.18  
+    ```
 
 ### Legacy version maintenance workflow
 
