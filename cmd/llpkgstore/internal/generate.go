@@ -43,7 +43,7 @@ func runLLCppgGenerateWithDir(dir string) {
 	// we have to feed the pc to llcppg
 	os.Setenv("PKG_CONFIG_PATH", dir)
 
-	generator := llcppg.New(dir)
+	generator := llcppg.New(dir, cfg.UpstreamConfig.PackageConfig.Name)
 
 	if err := generator.Generate(); err != nil {
 		log.Fatal(err)

@@ -5,6 +5,8 @@ import (
 	"os"
 	"reflect"
 	"testing"
+
+	"github.com/goplus/llpkgstore/actions/hashutils"
 )
 
 const (
@@ -29,18 +31,12 @@ const (
 	}`
 )
 
-func TestFindGoMod(t *testing.T) {
-	goModFile = "ggg.test"
-	l := &llcppgGenerator{dir: "."}
-	if ret := l.findGoMod(); ret != "testfind2/testfind" {
-		t.Errorf("unexpected find result: got %s want: testfind", ret)
-	}
-}
-
 func TestHash(t *testing.T) {
-	canHashFile["gg.test"] = struct{}{}
-	canHashFile["ggg.test"] = struct{}{}
-	m, err := hashDir("testfind2")
+	canHashFn := func(fileName string) bool {
+		return fileName == "gg.test" || fileName == "ggg.test"
+	}
+
+	m, err := hashutils.Dir("testfind2", canHashFn)
 	if err != nil {
 		t.Error(err)
 		return
@@ -54,7 +50,7 @@ func TestHash(t *testing.T) {
 		}, m)
 		return
 	}
-	m2, err := hashDir("testfind2/testfind")
+	m2, err := hashutils.Dir("testfind2/testfind", canHashFn)
 	if err != nil {
 		t.Error(err)
 		return
@@ -74,10 +70,9 @@ func TestHash(t *testing.T) {
 }
 
 func TestLlcppg(t *testing.T) {
-	goModFile = "go.mod"
 	os.Mkdir("testgenerate", 0777)
 	defer os.RemoveAll("testgenerate")
-	generator := New("testgenerate")
+	generator := New("testgenerate", "libcjson")
 	os.WriteFile("testgenerate/llcppg.cfg", []byte(testLlcppgConfig), 0755)
 	os.WriteFile("testgenerate/llpkg.cfg", []byte(testLlpkgConfig), 0755)
 
@@ -88,11 +83,6 @@ func TestLlcppg(t *testing.T) {
 	// copy out
 	os.CopyFS("testgenerate", os.DirFS("testgenerate/libcjson"))
 
-	baseDir := generator.(*llcppgGenerator).findGoMod()
-	if baseDir != "testgenerate/libcjson" {
-		t.Errorf("unexpected generate dir: want: testgenerate/libcjson got: %s", baseDir)
-		return
-	}
 	if err := generator.Check(); err != nil {
 		t.Error(err)
 		return

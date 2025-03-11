@@ -2,7 +2,9 @@ package actions
 
 import (
 	"context"
+	"encoding/json"
 	"net/http"
+	"os"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -55,6 +57,40 @@ func (d *DefaultClient) IsAssociatedWithPullRequest(sha string) (bool, error) {
 		pulls[0].GetMerged(), err
 }
 
+func (d *DefaultClient) currentPRCommit() []*github.RepositoryCommit {
+	eventFileName := os.Getenv("GITHUB_EVENT_PATH")
+	if eventFileName == "" {
+		panic("cannot get GITHUB_EVENT_PATH")
+	}
+	event, err := os.ReadFile(eventFileName)
+	if err != nil {
+		panic(err)
+	}
+	var m map[string]any
+	json.Unmarshal([]byte(event), &m)
+
+	if len(m) == 0 {
+		panic("cannot parse GITHUB_EVENT_PATH")
+	}
+	pullRequest, ok := m["pull_request"].(map[string]any)
+	if !ok {
+		panic("cannot parse GITHUB_EVENT_PATH pull_request")
+	}
+	prNumber := int(pullRequest["number"].(float64))
+
+	ctx, cancel := context.WithTimeout(context.TODO(), 30*time.Second)
+	defer cancel()
+	// use authorized API to avoid Github RateLimit
+	commits, _, err := d.client.PullRequests.ListCommits(
+		ctx, d.owner, d.repo, prNumber,
+		&github.ListOptions{},
+	)
+	if err != nil {
+		panic(err)
+	}
+	return commits
+}
+
 func isValidLlpkg(files []string) bool {
 	fileMap := make(map[string]struct{}, len(files))
 
@@ -85,6 +121,12 @@ func (d *DefaultClient) CheckPR() {
 		if err != nil {
 			panic(err)
 		}
+		// in our design, directory name should equal to the package name,
+		// which means it's not required to be equal.
+		//
+		// However, in current stage, if this is not equal, conan may panic,
+		// to aovid unexpected behavior, we assert it's equal temporarily.
+		// this logic may be changed in the future.
 		packageName := strings.TrimSpace(cfg.UpstreamConfig.PackageConfig.Name)
 		if packageName != path {
 			panic("directory name is not equal to package name in llpkg.cfg")
@@ -101,15 +143,17 @@ func (d *DefaultClient) CheckPR() {
 		panic("no valid config files, llpkg.cfg and llcppg.cfg must exist")
 	}
 
-	// 4. Check {MappedVersion} in the latest commit
-	commit := latestCommitMessageInPR()
-
-	versions := matchMappedVersion.FindAllString(commit, -1)
-	if len(versions) == 0 {
-		panic("no MappedVersion at the footer in the latest commit")
+	// 4. Check MappedVersion
+	found := false
+	for _, commit := range d.currentPRCommit() {
+		message := commit.GetCommit().GetMessage()
+		if matchMappedVersion.Match([]byte(message)) {
+			found = true
+			break
+		}
 	}
-	// store results in the workflow output
-	SetOutput(map[string]string{
-		"version": strings.TrimPrefix(versions[len(versions)-1], "Release-as: "),
-	})
+
+	if !found {
+		panic("no MappedVersion found in the PR")
+	}
 }
