@@ -7,8 +7,8 @@ import (
 
 const structJson = `{"upstream":{"installer":{"name":"conan"},"package":{"name":"cjson","version":"1.7.18"}}}`
 
-func TestParseLLpkgConfig(t *testing.T) {
-	config, err := ParseLLpkgConfig("../_demo/llpkg.cfg")
+func TestParseLLPkgConfig(t *testing.T) {
+	config, err := ParseLLPkgConfig("../_demo/llpkg.cfg")
 	if err != nil {
 		t.Errorf("Error parsing config file: %v", err)
 	}
