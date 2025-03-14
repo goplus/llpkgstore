@@ -96,29 +96,3 @@ func CreateBranch(branchName, tag string) error {
 	}
 	return nil
 }
-
-// latestCommitMessageInPR returns the latest commit in PR using git
-// so it's required to be at PR's ref.
-// In Github Action, Checkout Action will switch to PR's ref automatically,
-// it MUST NOT be used outside Github Action.
-func latestCommitMessageInPR() string {
-	// assume we're at PR's ref
-	ret, err := exec.Command("git", "show", "-s", "--format", "%s").CombinedOutput()
-	if err != nil {
-		panic(string(ret))
-	}
-	return string(ret)
-}
-
-func mappedVersion() string {
-	// get message via git
-	message := latestCommitMessageInPR()
-
-	// get the mapped version
-	mappedVersion := regex(".*").FindString(message)
-
-	if mappedVersion == "" {
-		panic("invalid pr: no mapped version found")
-	}
-	return strings.TrimPrefix(mappedVersion, "Release-as: ")
-}
