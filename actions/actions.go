@@ -109,3 +109,16 @@ func latestCommitMessageInPR() string {
 	}
 	return string(ret)
 }
+
+func mappedVersion() string {
+	// get message via git
+	message := latestCommitMessageInPR()
+
+	// get the mapped version
+	mappedVersion := regex(".*").FindString(message)
+
+	if mappedVersion == "" {
+		panic("invalid pr: no mapped version found")
+	}
+	return strings.TrimPrefix(mappedVersion, "Release-as: ")
+}

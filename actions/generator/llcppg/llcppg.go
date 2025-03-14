@@ -17,6 +17,7 @@ var (
 	canHashFile = map[string]struct{}{
 		"llcppg.pub": {},
 		"go.mod":     {},
+		"go.sum":     {},
 	}
 	ErrLlcppgGenerate = errors.New("llcppg: cannot generate: ")
 	ErrLlcppgCheck    = errors.New("llcppg: check fail: ")
@@ -34,7 +35,7 @@ const (
 // canHash check file is hashable.
 // Hashable file: *.go / llcppg.pub / *.symb.json
 func canHash(fileName string) bool {
-	if strings.Contains(fileName, ".go") {
+	if strings.Contains(fileName, ".go") || strings.Contains(fileName, ".symb.json") {
 		return true
 	}
 	_, ok := canHashFile[fileName]

@@ -52,7 +52,7 @@ func NewDefaultClient() *DefaultClient {
 	return dc
 }
 
-func (d *DefaultClient) HasBranch(branchName string) (bool, error) {
+func (d *DefaultClient) hasBranch(branchName string) (bool, error) {
 	ctx, cancel := context.WithTimeout(context.TODO(), 30*time.Second)
 	defer cancel()
 
@@ -65,7 +65,27 @@ func (d *DefaultClient) HasBranch(branchName string) (bool, error) {
 	return exists, err
 }
 
-func (d *DefaultClient) IsAssociatedWithPullRequest(sha string) (bool, error) {
+func (d *DefaultClient) hasTag(tag string) (bool, error) {
+	ctx, cancel := context.WithTimeout(context.TODO(), 30*time.Second)
+	defer cancel()
+
+	tags, _, err := d.client.Repositories.ListTags(
+		ctx, d.owner, d.repo, &github.ListOptions{},
+	)
+	if err != nil {
+		return false, err
+	}
+	found := false
+	for _, current := range tags {
+		if current.GetName() == tag {
+			found = true
+			break
+		}
+	}
+	return found, nil
+}
+
+func (d *DefaultClient) isAssociatedWithPullRequest(sha string) (bool, error) {
 	ctx, cancel := context.WithTimeout(context.TODO(), 30*time.Second)
 	defer cancel()
 
@@ -183,4 +203,47 @@ func (d *DefaultClient) CheckPR() []string {
 	}
 
 	return slices.Collect(maps.Keys(pathMap))
+}
+
+func (d *DefaultClient) Release() {
+	// https://docs.github.com/en/actions/writing-workflows/choosing-when-your-workflow-runs/events-that-trigger-workflows#push
+	sha := os.Getenv("GITHUB_SHA")
+	if sha == "" {
+		panic("no GITHUB_SHA found")
+	}
+	// check it's associated with a pr
+	ok, err := d.isAssociatedWithPullRequest(sha)
+	if err != nil {
+		panic(err)
+	}
+	// not a merge commit, skip it.
+	if !ok {
+		return
+	}
+	version := mappedVersion()
+	ok, err = d.hasTag(version)
+	if err != nil {
+		panic(err)
+	}
+	// has tag already, skip it.
+	if ok {
+		return
+	}
+	ctx, cancel := context.WithTimeout(context.TODO(), 30*time.Second)
+	defer cancel()
+
+	// tag the commit
+	tagRef := "refs/tags/" + version
+	_, _, err = d.client.Git.CreateRef(ctx, d.owner, d.repo, &github.Reference{
+		Ref: &tagRef,
+		Object: &github.GitObject{
+			SHA: &sha,
+		},
+	})
+
+	if err != nil {
+		panic(err)
+	}
+
+	// TODO: write it to llpkgstore.json
 }

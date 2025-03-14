@@ -1,6 +1,7 @@
 package internal
 
 import (
+	"github.com/goplus/llpkgstore/actions"
 	"github.com/spf13/cobra"
 )
 
@@ -12,7 +13,7 @@ var postProcessingCmd = &cobra.Command{
 }
 
 func runPostProcessingCmd(_ *cobra.Command, _ []string) {
-	//TODO
+	actions.NewDefaultClient().Release()
 }
 
 func init() {
