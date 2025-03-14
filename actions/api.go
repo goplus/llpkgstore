@@ -94,7 +94,7 @@ func (d *DefaultClient) isAssociatedWithPullRequest(sha string) (bool, error) {
 	)
 
 	return len(pulls) > 0 &&
-		pulls[0].GetMerged(), err
+		pulls[0].GetState() == "closed", err
 }
 
 // currentPRCommit returns all the commits for the current PR.
@@ -147,6 +147,30 @@ func (d *DefaultClient) checkMappedVersion(packageName string) {
 	if !found {
 		panic("no MappedVersion found in the PR")
 	}
+}
+
+func (d *DefaultClient) commitMessage(sha string) *github.RepositoryCommit {
+	ctx, cancel := context.WithTimeout(context.TODO(), 30*time.Second)
+	defer cancel()
+
+	commit, _, err := d.client.Repositories.GetCommit(ctx, d.owner, d.repo, sha, &github.ListOptions{})
+	if err != nil {
+		panic(err)
+	}
+	return commit
+}
+
+func (d *DefaultClient) mappedVersion() string {
+	// get message via git
+	message := d.commitMessage(os.Getenv("GITHUB_SHA")).GetCommit().GetMessage()
+
+	// get the mapped version
+	mappedVersion := regex(".*").FindString(message)
+
+	if mappedVersion == "" {
+		panic("invalid pr: no mapped version found")
+	}
+	return strings.TrimPrefix(mappedVersion, "Release-as: ")
 }
 
 func (d *DefaultClient) CheckPR() []string {
@@ -220,7 +244,7 @@ func (d *DefaultClient) Release() {
 	if !ok {
 		return
 	}
-	version := mappedVersion()
+	version := d.mappedVersion()
 	ok, err = d.hasTag(version)
 	if err != nil {
 		panic(err)
