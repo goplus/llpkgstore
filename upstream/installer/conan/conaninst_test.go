@@ -11,7 +11,11 @@ import (
 )
 
 func TestConanInstaller(t *testing.T) {
-	c := &conanInstaller{}
+	c := &conanInstaller{
+		config: map[string]string{
+			"options": `cjson/*:utils=True`,
+		},
+	}
 
 	pkg := upstream.Package{
 		Name:    "cjson",

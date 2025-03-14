@@ -9,15 +9,20 @@ func TestCmdBuilder(t *testing.T) {
 
 	name := "conan"
 	subcommand := "install"
-	args := map[string]string{
+	argMap := map[string]string{
 		"requires": "cjson/1.7.18",
-		"options":  "\\*:shared=True",
+		"options":  `*:shared=True cjson/*:utils=True`,
 		"build":    "missing",
+	}
+	args := []string{
+		"--requires=cjson/1.7.18",
+		`--options=*:shared=True cjson/*:utils=True`,
+		"--build=missing",
 	}
 
 	conanBuilder.SetName(name)
 	conanBuilder.SetSubcommand(subcommand)
-	for k, v := range args {
+	for k, v := range argMap {
 		conanBuilder.SetArg(k, v)
 	}
 
@@ -31,7 +36,7 @@ func TestCmdBuilder(t *testing.T) {
 
 	for k, v := range args {
 		if conanBuilder.args[k] != v {
-			t.Errorf("Unexpected arg: %s=%s", k, v)
+			t.Errorf("Unexpected arg: %s", conanBuilder.args[k])
 		}
 	}
 }

@@ -2,7 +2,6 @@ package conan
 
 import (
 	"fmt"
-	"os/exec"
 	"strings"
 
 	"github.com/goplus/llpkgstore/internal/cmdbuilder"
@@ -45,8 +44,9 @@ func (c *conanInstaller) Config() map[string]string {
 }
 
 // options combines Conan default options with user-specified options from configuration
-func (c *conanInstaller) options() string {
-	return strings.Join([]string{"\\*:shared=True", c.config["options"]}, " ")
+func (c *conanInstaller) options() []string {
+	arr := strings.Join([]string{`*:shared=True`, c.config["options"]}, " ")
+	return strings.Fields(arr)
 }
 
 // Install executes Conan installation for the specified package into the output directory.
@@ -61,11 +61,14 @@ func (c *conanInstaller) Install(pkg upstream.Package, outputDir string) error {
 	builder.SetSubcommand("install")
 	builder.SetArg("requires", pkg.Name+"/"+pkg.Version)
 	builder.SetArg("generator", "PkgConfigDeps")
-	builder.SetArg("options", c.options())
 	builder.SetArg("build", "missing")
 	builder.SetArg("output-folder", outputDir)
 
-	buildCmd := exec.Command(builder.Name(), append([]string{builder.Subcommand()}, builder.Args()...)...)
+	for _, opt := range c.options() {
+		builder.SetArg("options", opt)
+	}
+
+	buildCmd := builder.Cmd()
 
 	out, err := buildCmd.CombinedOutput()
 	if err != nil {

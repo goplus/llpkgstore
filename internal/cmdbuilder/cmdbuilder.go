@@ -14,22 +14,20 @@ type CmdBuilder struct {
 	serilazier CmdBuilderSerilizer
 	name       string
 	subcommand string
-	args       map[string]string
+	args       []string
 	objs       []string
 }
 
 func WithConanSerilazier() Options {
 	return func(cb *CmdBuilder) {
 		cb.serilazier = func(k, v string) string {
-			return fmt.Sprintf("--%s=%s", k, v)
+			return fmt.Sprintf(`--%s=%s`, k, v)
 		}
 	}
 }
 
 func NewCmdBuilder(opts ...Options) *CmdBuilder {
-	c := &CmdBuilder{
-		args: make(map[string]string),
-	}
+	c := &CmdBuilder{}
 
 	for _, o := range opts {
 		o(c)
@@ -47,7 +45,7 @@ func (c *CmdBuilder) SetSubcommand(s string) {
 }
 
 func (c *CmdBuilder) SetArg(k, v string) {
-	c.args[k] = v
+	c.args = append(c.args, c.serilazier(k, v))
 }
 
 func (c *CmdBuilder) SetObj(o string) {
@@ -63,13 +61,7 @@ func (c *CmdBuilder) Subcommand() string {
 }
 
 func (c *CmdBuilder) Args() []string {
-	var cmds []string
-
-	for k, v := range c.args {
-		cmds = append(cmds, c.serilazier(k, v))
-	}
-
-	return cmds
+	return c.args
 }
 
 func (c *CmdBuilder) Objs() []string {
