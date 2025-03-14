@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/goplus/llpkgstore/actions"
 	"github.com/goplus/llpkgstore/actions/generator/llcppg"
 	"github.com/goplus/llpkgstore/config"
 	"github.com/spf13/cobra"
@@ -13,37 +14,29 @@ import (
 const LLGOModuleIdentifyFile = "llpkg.cfg"
 
 var generateCmd = &cobra.Command{
-	Use:   "generate",
-	Short: "Generate a llpkg",
+	Use:   "verfication",
+	Short: "PR Verification",
 	Long:  ``,
 	Run:   runLLCppgGenerate,
 }
 
-func currentDir() string {
-	absFile, err := os.Executable()
-	if err != nil {
-		log.Fatalf("cannot get current path: %v", err)
-	}
-	return filepath.Dir(absFile)
-}
-
 func runLLCppgGenerateWithDir(dir string) {
-	cfg, err := config.ParseLLpkgConfig(filepath.Join(dir, LLGOModuleIdentifyFile))
+	cfg, err := config.ParseLLPkgConfig(filepath.Join(dir, LLGOModuleIdentifyFile))
 	if err != nil {
 		log.Fatalf("parse config error: %v", err)
 	}
-	uc, err := config.NewUpstreamFromConfig(cfg.UpstreamConfig)
+	uc, err := config.NewUpstreamFromConfig(cfg.Upstream)
 	if err != nil {
 		log.Fatal()
 	}
-	err = uc.Installer().Install(uc.Package(), dir)
+	err = uc.Installer.Install(uc.Pkg, dir)
 	if err != nil {
 		log.Fatal(err)
 	}
 	// we have to feed the pc to llcppg
 	os.Setenv("PKG_CONFIG_PATH", dir)
 
-	generator := llcppg.New(dir, cfg.UpstreamConfig.PackageConfig.Name)
+	generator := llcppg.New(dir, cfg.Upstream.Package.Name)
 
 	if err := generator.Generate(); err != nil {
 		log.Fatal(err)
@@ -54,7 +47,12 @@ func runLLCppgGenerateWithDir(dir string) {
 }
 
 func runLLCppgGenerate(_ *cobra.Command, _ []string) {
-	runLLCppgGenerateWithDir(currentDir())
+	paths := actions.NewDefaultClient().CheckPR()
+
+	for _, path := range paths {
+		absPath, _ := filepath.Abs(path)
+		runLLCppgGenerateWithDir(absPath)
+	}
 }
 
 func init() {

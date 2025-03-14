@@ -3,10 +3,13 @@ package actions
 import (
 	"context"
 	"encoding/json"
+	"fmt"
+	"maps"
 	"net/http"
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strings"
 	"time"
 
@@ -14,9 +17,26 @@ import (
 	"github.com/goplus/llpkgstore/config"
 )
 
-// format: Release-as: clib/semver(with v prefix)
-// Must have one space in the end of Release-as:
-var matchMappedVersion = regexp.MustCompile(`Release-as:\s.*/v(?P<major>0|[1-9]\d*)\.(?P<minor>0|[1-9]\d*)\.(?P<patch>0|[1-9]\d*)(?:-(?P<prerelease>(?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*)(?:\.(?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*))*))?(?:\+(?P<buildmetadata>[0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?$`)
+const (
+	regexString = `Release-as:\s%s/v(?P<major>0|[1-9]\d*)\.(?P<minor>0|[1-9]\d*)\.(?P<patch>0|[1-9]\d*)(?:-(?P<prerelease>(?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*)(?:\.(?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*))*))?(?:\+(?P<buildmetadata>[0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?$`
+)
+
+func regex(packageName string) *regexp.Regexp {
+	// format: Release-as: clib/semver(with v prefix)
+	// Must have one space in the end of Release-as:
+	return regexp.MustCompile(fmt.Sprintf(regexString, packageName))
+}
+
+func isValidLlpkg(files []string) bool {
+	fileMap := make(map[string]struct{}, len(files))
+
+	for _, file := range files {
+		fileMap[file] = struct{}{}
+	}
+	_, hasLlpkg := fileMap["llpkg.cfg"]
+	_, hasLlcppg := fileMap["llcppg.cfg"]
+	return hasLlcppg && hasLlpkg
+}
 
 type DefaultClient struct {
 	repo   string
@@ -57,6 +77,7 @@ func (d *DefaultClient) IsAssociatedWithPullRequest(sha string) (bool, error) {
 		pulls[0].GetMerged(), err
 }
 
+// currentPRCommit returns all the commits for the current PR.
 func (d *DefaultClient) currentPRCommit() []*github.RepositoryCommit {
 	eventFileName := os.Getenv("GITHUB_EVENT_PATH")
 	if eventFileName == "" {
@@ -91,46 +112,56 @@ func (d *DefaultClient) currentPRCommit() []*github.RepositoryCommit {
 	return commits
 }
 
-func isValidLlpkg(files []string) bool {
-	fileMap := make(map[string]struct{}, len(files))
+func (d *DefaultClient) checkMappedVersion(packageName string) {
+	matchMappedVersion := regex(packageName)
 
-	for _, file := range files {
-		fileMap[file] = struct{}{}
+	found := false
+	for _, commit := range d.currentPRCommit() {
+		message := commit.GetCommit().GetMessage()
+		if matchMappedVersion.Match([]byte(message)) {
+			found = true
+			break
+		}
 	}
-	_, hasLlpkg := fileMap["llpkg.cfg"]
-	_, hasLlcppg := fileMap["llcppg.cfg"]
-	return hasLlcppg && hasLlpkg
+
+	if !found {
+		panic("no MappedVersion found in the PR")
+	}
 }
 
-func (d *DefaultClient) CheckPR() {
+func (d *DefaultClient) CheckPR() []string {
 	// build a file path map
 	pathMap := map[string][]string{}
 	for _, path := range Changes() {
 		dir := filepath.Dir(path)
 		pathMap[dir] = append(pathMap[dir], filepath.Base(path))
 	}
+	var packages []string
 
-	for path, files := range pathMap {
+	for path := range pathMap {
+		files := pathMap[path]
+
 		if !isValidLlpkg(files) {
 			delete(pathMap, path)
 			continue
 		}
 		// 3. Check directory name
 		llpkgFile := filepath.Join(path, "llpkg.cfg")
-		cfg, err := config.ParseLLpkgConfig(llpkgFile)
+		cfg, err := config.ParseLLPkgConfig(llpkgFile)
 		if err != nil {
 			panic(err)
 		}
 		// in our design, directory name should equal to the package name,
 		// which means it's not required to be equal.
 		//
-		// However, in current stage, if this is not equal, conan may panic,
+		// However, at the current stage, if this is not equal, conan may panic,
 		// to aovid unexpected behavior, we assert it's equal temporarily.
 		// this logic may be changed in the future.
-		packageName := strings.TrimSpace(cfg.UpstreamConfig.PackageConfig.Name)
+		packageName := strings.TrimSpace(cfg.Upstream.Package.Name)
 		if packageName != path {
 			panic("directory name is not equal to package name in llpkg.cfg")
 		}
+		packages = append(packages, packageName)
 	}
 
 	// 1. Check there's only one directory in PR
@@ -144,16 +175,12 @@ func (d *DefaultClient) CheckPR() {
 	}
 
 	// 4. Check MappedVersion
-	found := false
-	for _, commit := range d.currentPRCommit() {
-		message := commit.GetCommit().GetMessage()
-		if matchMappedVersion.Match([]byte(message)) {
-			found = true
-			break
-		}
+	//
+	// it should be one package name at the current stage,
+	// however, in the future, it may allow multiple packages.
+	for _, packageName := range packages {
+		d.checkMappedVersion(packageName)
 	}
 
-	if !found {
-		panic("no MappedVersion found in the PR")
-	}
+	return slices.Collect(maps.Keys(pathMap))
 }
