@@ -171,9 +171,25 @@ func (d *DefaultClient) mappedVersion() string {
 
 	// mapped version not found, a normal commit?
 	if mappedVersion == "" {
-		os.Exit(0)
+		return ""
 	}
 	return strings.TrimPrefix(mappedVersion, "Release-as: ")
+}
+
+func (d *DefaultClient) createTag(tag, sha string) error {
+	ctx, cancel := context.WithTimeout(context.TODO(), 30*time.Second)
+	defer cancel()
+
+	// tag the commit
+	tagRef := "refs/tags/" + tag
+	_, _, err := d.client.Git.CreateRef(ctx, d.owner, d.repo, &github.Reference{
+		Ref: &tagRef,
+		Object: &github.GitObject{
+			SHA: &sha,
+		},
+	})
+
+	return err
 }
 
 func (d *DefaultClient) CheckPR() []string {
@@ -239,38 +255,35 @@ func (d *DefaultClient) Release() {
 		panic("no GITHUB_SHA found")
 	}
 	// check it's associated with a pr
-	ok, err := d.isAssociatedWithPullRequest(sha)
-	if err != nil {
-		panic(err)
+	if ok, err := d.isAssociatedWithPullRequest(sha); err != nil || !ok {
+		if err != nil {
+			panic(err)
+		}
+		// not a merge commit, skip it.
+		if !ok {
+			return
+		}
 	}
-	// not a merge commit, skip it.
-	if !ok {
-		return
-	}
+
 	version := d.mappedVersion()
-	ok, err = d.hasTag(version)
-	if err != nil {
-		panic(err)
-	}
-	// has tag already, skip it.
-	if ok {
+
+	// skip it when no mapped version is found
+	if version == "" {
 		return
 	}
-	ctx, cancel := context.WithTimeout(context.TODO(), 30*time.Second)
-	defer cancel()
 
-	// tag the commit
-	tagRef := "refs/tags/" + version
-	_, _, err = d.client.Git.CreateRef(ctx, d.owner, d.repo, &github.Reference{
-		Ref: &tagRef,
-		Object: &github.GitObject{
-			SHA: &sha,
-		},
-	})
-
-	if err != nil {
-		panic(err)
+	if ok, err := d.hasTag(version); err != nil || ok {
+		if err != nil {
+			panic(err)
+		}
+		// tag existed already, skip it.
+		if ok {
+			return
+		}
 	}
 
+	if err := d.createTag(version, sha); err != nil {
+		panic(err)
+	}
 	// TODO: write it to llpkgstore.json
 }
