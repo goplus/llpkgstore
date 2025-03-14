@@ -94,7 +94,7 @@ func (d *DefaultClient) isAssociatedWithPullRequest(sha string) (bool, error) {
 	)
 	// don't use GetMerge, because GetMerge may be a mistake.
 	// sometime, when a pull request is merged, GetMerge still returns false.
-	// so check pull request state is more accurate.
+	// so checking pull request state is more accurate.
 	return len(pulls) > 0 &&
 		pulls[0].GetState() == "closed", err
 }
@@ -163,14 +163,15 @@ func (d *DefaultClient) commitMessage(sha string) *github.RepositoryCommit {
 }
 
 func (d *DefaultClient) mappedVersion() string {
-	// get message via git
+	// get message
 	message := d.commitMessage(os.Getenv("GITHUB_SHA")).GetCommit().GetMessage()
 
-	// get the mapped version
+	// parse the mapped version
 	mappedVersion := regex(".*").FindString(message)
 
+	// mapped version not found, a normal commit?
 	if mappedVersion == "" {
-		panic("invalid pr: no mapped version found")
+		os.Exit(0)
 	}
 	return strings.TrimPrefix(mappedVersion, "Release-as: ")
 }
