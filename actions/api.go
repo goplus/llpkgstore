@@ -92,7 +92,9 @@ func (d *DefaultClient) isAssociatedWithPullRequest(sha string) (bool, error) {
 	pulls, _, err := d.client.PullRequests.ListPullRequestsWithCommit(
 		ctx, d.owner, d.repo, sha, &github.ListOptions{},
 	)
-
+	// don't use GetMerge, because GetMerge may be a mistake.
+	// sometime, when a pull request is merged, GetMerge still returns false.
+	// so check pull request state is more accurate.
 	return len(pulls) > 0 &&
 		pulls[0].GetState() == "closed", err
 }
