@@ -19,12 +19,14 @@ type Versions struct {
 	cVerToGoVer map[string]CVerMap
 }
 
+// appendUnique adds a unique element to a slice.
 func appendUnique(arr []string, elem string) []string {
 	arr = append(arr, elem)
 	slices.Sort(arr)
 	return slices.Compact(arr)
 }
 
+// ReadVersion reads version mappings from a file and initializes the Versions struct
 func ReadVersion(fileName string) *Versions {
 	f, err := os.OpenFile(fileName, os.O_CREATE|os.O_RDONLY, 0644)
 	if err != nil {
@@ -52,6 +54,7 @@ func ReadVersion(fileName string) *Versions {
 	return v
 }
 
+// build constructs the cVerToGoVer map from the metadata
 func (v *Versions) build() {
 	// O(n)
 	for clib := range v.MetadataMap {
@@ -66,6 +69,7 @@ func (v *Versions) build() {
 	}
 }
 
+// queryClibVersion finds or creates a VersionMapping for the given C library and version
 func (v *Versions) queryClibVersion(clib, clibVersion string) (versions *metadata.VersionMapping, needCreate bool) {
 	versions = v.cVerToGoVer[clib].Get(clibVersion)
 	// fast-path: we have a cache
@@ -74,10 +78,12 @@ func (v *Versions) queryClibVersion(clib, clibVersion string) (versions *metadat
 	}
 	// slow-path: parse it
 	allVersions := v.MetadataMap[clib]
-	for _, mapping := range allVersions.VersionMappings {
-		if mapping.CVersion == clibVersion {
-			versions = mapping
-			return
+	if allVersions != nil {
+		for _, mapping := range allVersions.VersionMappings {
+			if mapping.CVersion == clibVersion {
+				versions = mapping
+				return
+			}
 		}
 	}
 	needCreate = true
@@ -86,12 +92,16 @@ func (v *Versions) queryClibVersion(clib, clibVersion string) (versions *metadat
 	return
 }
 
+// LatestGoVersion returns the latest Go version associated with the given C library
 func (v *Versions) LatestGoVersion(clib string) string {
 	clibVer := v.cVerToGoVer[clib].LatestGoVersion()
 	if clibVer != "" {
 		return clibVer
 	}
 	allVersions := v.MetadataMap[clib]
+	if allVersions == nil {
+		return ""
+	}
 	var tmp []string
 	for _, verions := range allVersions.VersionMappings {
 		tmp = append(tmp, verions.GoVersions...)
@@ -103,15 +113,17 @@ func (v *Versions) LatestGoVersion(clib string) string {
 	return tmp[len(tmp)-1]
 }
 
+// Write records a new Go version mapping for a C library version and persists to file
 func (v *Versions) Write(clib, clibVersion, mappedVersion string) {
 	versions, needCreate := v.queryClibVersion(clib, clibVersion)
 
 	versions.GoVersions = appendUnique(versions.GoVersions, mappedVersion)
 
 	if needCreate {
-		current := v.MetadataMap[clib]
-		current.VersionMappings = append(current.VersionMappings, versions)
-		v.MetadataMap[clib] = current
+		if v.MetadataMap[clib] == nil {
+			v.MetadataMap[clib] = &metadata.Metadata{}
+		}
+		v.MetadataMap[clib].VersionMappings = append(v.MetadataMap[clib].VersionMappings, versions)
 	}
 	// sync to disk
 	b, _ := json.Marshal(&v.MetadataMap)

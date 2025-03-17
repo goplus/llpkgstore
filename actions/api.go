@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log"
 	"maps"
 	"net/http"
 	"os"
@@ -15,7 +16,9 @@ import (
 	"time"
 
 	"github.com/google/go-github/v69/github"
+	"github.com/goplus/llpkgstore/actions/versions"
 	"github.com/goplus/llpkgstore/config"
+	"golang.org/x/mod/semver"
 )
 
 const (
@@ -25,13 +28,38 @@ const (
 	regexString         = `Release-as:\s%s/v(?P<major>0|[1-9]\d*)\.(?P<minor>0|[1-9]\d*)\.(?P<patch>0|[1-9]\d*)(?:-(?P<prerelease>(?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*)(?:\.(?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*))*))?(?:\+(?P<buildmetadata>[0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?$`
 )
 
+func parseMappedVersion(version string) (clib, mappedVersion string) {
+	arr := strings.Split(version, "/")
+	if len(arr) != 2 {
+		panic("invalid mapped version format")
+	}
+	clib, mappedVersion = arr[0], arr[1]
+
+	if !semver.IsValid(mappedVersion) {
+		panic("invalid mapped version format: mappedVersion is not a semver")
+	}
+	return
+}
+
 func tagRef(tag string) string {
-	return "refs/tags/" + tag
+	return "refs/tags/" + strings.TrimSpace(tag)
+}
+
+func branchRef(branchName string) string {
+	return "refs/heads/" + strings.TrimSpace(branchName)
 }
 
 func hasTag(tag string) bool {
 	_, err := exec.Command("git", "rev-parse", tagRef(tag)).CombinedOutput()
 	return err == nil
+}
+
+func shaFromTag(tag string) string {
+	ret, err := exec.Command("git", "rev-list", "-n", "1", tag).CombinedOutput()
+	if err != nil {
+		log.Fatalf("cannot find a tag: %s", tag)
+	}
+	return strings.TrimSpace(string(ret))
 }
 
 func regex(packageName string) *regexp.Regexp {
@@ -193,6 +221,21 @@ func (d *DefaultClient) createTag(tag, sha string) error {
 	return err
 }
 
+func (d *DefaultClient) createBranch(branchName, sha string) error {
+	ctx, cancel := context.WithTimeout(context.TODO(), 30*time.Second)
+	defer cancel()
+
+	branchRefName := branchRef(branchName)
+	_, _, err := d.client.Git.CreateRef(ctx, d.owner, d.repo, &github.Reference{
+		Ref: &branchRefName,
+		Object: &github.GitObject{
+			SHA: &sha,
+		},
+	})
+
+	return err
+}
+
 func (d *DefaultClient) CheckPR() []string {
 	// build a file path map
 	pathMap := map[string][]string{}
@@ -275,7 +318,20 @@ func (d *DefaultClient) Release() {
 	if err := d.createTag(version, sha); err != nil {
 		panic(err)
 	}
-	// TODO: write it to llpkgstore.json
+
+	clib, mappedVersion := parseMappedVersion(version)
+
+	// the pr has merged, so we can read it.
+	config, err := config.ParseLLPkgConfig(filepath.Join(clib, "llpkg.cfg"))
+	if err != nil {
+		panic(err)
+	}
+
+	// write it to llpkgstore.json
+	ver := versions.ReadVersion("llpkgstore.json")
+	ver.Write(clib, config.Upstream.Package.Version, mappedVersion)
+
+	// move to website in Github Action...
 }
 
 func (d *DefaultClient) CreateBranchFromLabel(labelName string) {
@@ -289,12 +345,26 @@ func (d *DefaultClient) CreateBranchFromLabel(labelName string) {
 	if d.hasBranch(branchName) {
 		return
 	}
-
+	version := strings.TrimPrefix(labelName, BranchPrefix)
+	if version == labelName {
+		panic("invalid label name format")
+	}
+	clib, mappedVersion := parseMappedVersion(version)
 	// slow-path: check the condition if we can create a branch
 	//
 	// create a branch only when this version is legacy.
 	// according to branch maintenance strategy
 
-	// step 1: get all releated version
+	// step 1: get latest version of the clib
+	ver := versions.ReadVersion("llpkgstore.json")
+	latestVersion := ver.LatestGoVersion(clib)
 
+	// unnecessary to create a branch if mappedVersion >= latestVersion
+	if semver.Compare(mappedVersion, latestVersion) >= 0 {
+		return
+	}
+
+	if err := d.createBranch(branchName, shaFromTag(version)); err != nil {
+		panic(err)
+	}
 }

@@ -36,7 +36,7 @@ func TestLatestVersion(t *testing.T) {
 
 func TestAppend(t *testing.T) {
 	v := ReadVersion("llpkgstore.json")
-	//defer os.Remove("llpkgstore.json")
+	defer os.Remove("llpkgstore.json")
 
 	v.Write("cjson", "1.7.18", "v1.0.0")
 	v.Write("cjson", "1.7.19", "v1.0.2")
@@ -45,10 +45,14 @@ func TestAppend(t *testing.T) {
 	//defer os.Remove("llpkgstore.json")
 
 	v.Write("cjson", "1.7.18", "v1.0.1")
+	v.Write("libxml", "1.45.1.4", "v1.0.0")
+
+	v = ReadVersion("llpkgstore.json")
+	v.Write("libxml", "1.45.1.5", "v1.0.1")
 
 	b, _ := os.ReadFile("llpkgstore.json")
 
-	if !bytes.Equal(b, []byte(`{"cjson":{"versions":[{"c":"1.7.18","go":["v1.0.0","v1.0.1"]},{"c":"1.7.19","go":["v1.0.2"]}]}}`)) {
+	if !bytes.Equal(b, []byte(`{"cjson":{"versions":[{"c":"1.7.18","go":["v1.0.0","v1.0.1"]},{"c":"1.7.19","go":["v1.0.2"]}]},"libxml":{"versions":[{"c":"1.45.1.4","go":["v1.0.0"]},{"c":"1.45.1.5","go":["v1.0.1"]}]}}`)) {
 		t.Error("unexpected append result")
 	}
 }
