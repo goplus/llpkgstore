@@ -7,6 +7,7 @@ import (
 	"maps"
 	"net/http"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"regexp"
 	"slices"
@@ -18,8 +19,20 @@ import (
 )
 
 const (
-	regexString = `Release-as:\s%s/v(?P<major>0|[1-9]\d*)\.(?P<minor>0|[1-9]\d*)\.(?P<patch>0|[1-9]\d*)(?:-(?P<prerelease>(?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*)(?:\.(?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*))*))?(?:\+(?P<buildmetadata>[0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?$`
+	LabelPrefix         = "branch:"
+	BranchPrefix        = "release-branch."
+	MappedVersionPrefix = "Release-as: "
+	regexString         = `Release-as:\s%s/v(?P<major>0|[1-9]\d*)\.(?P<minor>0|[1-9]\d*)\.(?P<patch>0|[1-9]\d*)(?:-(?P<prerelease>(?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*)(?:\.(?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*))*))?(?:\+(?P<buildmetadata>[0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?$`
 )
+
+func tagRef(tag string) string {
+	return "refs/tags/" + tag
+}
+
+func hasTag(tag string) bool {
+	_, err := exec.Command("git", "rev-parse", tagRef(tag)).CombinedOutput()
+	return err == nil
+}
 
 func regex(packageName string) *regexp.Regexp {
 	// format: Release-as: clib/semver(with v prefix)
@@ -52,51 +65,35 @@ func NewDefaultClient() *DefaultClient {
 	return dc
 }
 
-func (d *DefaultClient) hasBranch(branchName string) (bool, error) {
+func (d *DefaultClient) hasBranch(branchName string) bool {
 	ctx, cancel := context.WithTimeout(context.TODO(), 30*time.Second)
 	defer cancel()
 
 	branch, resp, err := d.client.Repositories.GetBranch(
 		ctx, d.owner, d.repo, branchName, 0,
 	)
-	exists := err == nil &&
-		branch != nil &&
-		resp.StatusCode == http.StatusOK
-	return exists, err
-}
-
-func (d *DefaultClient) hasTag(tag string) (bool, error) {
-	ctx, cancel := context.WithTimeout(context.TODO(), 30*time.Second)
-	defer cancel()
-
-	tags, _, err := d.client.Repositories.ListTags(
-		ctx, d.owner, d.repo, &github.ListOptions{},
-	)
 	if err != nil {
-		return false, err
+		panic(err)
 	}
-	found := false
-	for _, current := range tags {
-		if current.GetName() == tag {
-			found = true
-			break
-		}
-	}
-	return found, nil
+	return branch != nil &&
+		resp.StatusCode == http.StatusOK
 }
 
-func (d *DefaultClient) isAssociatedWithPullRequest(sha string) (bool, error) {
+func (d *DefaultClient) isAssociatedWithPullRequest(sha string) bool {
 	ctx, cancel := context.WithTimeout(context.TODO(), 30*time.Second)
 	defer cancel()
 
 	pulls, _, err := d.client.PullRequests.ListPullRequestsWithCommit(
 		ctx, d.owner, d.repo, sha, &github.ListOptions{},
 	)
+	if err != nil {
+		panic(err)
+	}
 	// don't use GetMerge, because GetMerge may be a mistake.
 	// sometime, when a pull request is merged, GetMerge still returns false.
 	// so checking pull request state is more accurate.
 	return len(pulls) > 0 &&
-		pulls[0].GetState() == "closed", err
+		pulls[0].GetState() == "closed"
 }
 
 // currentPRCommit returns all the commits for the current PR.
@@ -173,7 +170,11 @@ func (d *DefaultClient) mappedVersion() string {
 	if mappedVersion == "" {
 		return ""
 	}
-	return strings.TrimPrefix(mappedVersion, "Release-as: ")
+	version := strings.TrimPrefix(mappedVersion, MappedVersionPrefix)
+	if version == mappedVersion {
+		panic("invalid format")
+	}
+	return version
 }
 
 func (d *DefaultClient) createTag(tag, sha string) error {
@@ -181,9 +182,9 @@ func (d *DefaultClient) createTag(tag, sha string) error {
 	defer cancel()
 
 	// tag the commit
-	tagRef := "refs/tags/" + tag
+	tagRefName := tagRef(tag)
 	_, _, err := d.client.Git.CreateRef(ctx, d.owner, d.repo, &github.Reference{
-		Ref: &tagRef,
+		Ref: &tagRefName,
 		Object: &github.GitObject{
 			SHA: &sha,
 		},
@@ -255,35 +256,45 @@ func (d *DefaultClient) Release() {
 		panic("no GITHUB_SHA found")
 	}
 	// check it's associated with a pr
-	if ok, err := d.isAssociatedWithPullRequest(sha); err != nil || !ok {
-		if err != nil {
-			panic(err)
-		}
+	if !d.isAssociatedWithPullRequest(sha) {
 		// not a merge commit, skip it.
-		if !ok {
-			return
-		}
+		return
 	}
 
 	version := d.mappedVersion()
-
 	// skip it when no mapped version is found
 	if version == "" {
 		return
 	}
 
-	if ok, err := d.hasTag(version); err != nil || ok {
-		if err != nil {
-			panic(err)
-		}
+	if hasTag(version) {
 		// tag existed already, skip it.
-		if ok {
-			return
-		}
+		return
 	}
 
 	if err := d.createTag(version, sha); err != nil {
 		panic(err)
 	}
 	// TODO: write it to llpkgstore.json
+}
+
+func (d *DefaultClient) CreateBranchFromLabel(labelName string) {
+	// design: branch:release-branch.{CLibraryName}/{MappedVersion}
+	branchName := strings.TrimPrefix(labelName, LabelPrefix)
+	if branchName == labelName {
+		panic("invalid label name format")
+	}
+
+	// fast-path: branch exists, can skip.
+	if d.hasBranch(branchName) {
+		return
+	}
+
+	// slow-path: check the condition if we can create a branch
+	//
+	// create a branch only when this version is legacy.
+	// according to branch maintenance strategy
+
+	// step 1: get all releated version
+
 }
