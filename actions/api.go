@@ -1,3 +1,4 @@
+// Package actions contains GitHub Actions helper functions for version management and repository operations.
 package actions
 
 import (
@@ -28,6 +29,9 @@ const (
 	regexString         = `Release-as:\s%s/v(?P<major>0|[1-9]\d*)\.(?P<minor>0|[1-9]\d*)\.(?P<patch>0|[1-9]\d*)(?:-(?P<prerelease>(?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*)(?:\.(?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*))*))?(?:\+(?P<buildmetadata>[0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?$`
 )
 
+// parseMappedVersion splits the mapped version string into library name and version.
+// Input format: "clib/semver" where semver starts with 'v'
+// Panics if input format is invalid or version isn't valid semantic version
 func parseMappedVersion(version string) (clib, mappedVersion string) {
 	arr := strings.Split(version, "/")
 	if len(arr) != 2 {
@@ -41,19 +45,24 @@ func parseMappedVersion(version string) (clib, mappedVersion string) {
 	return
 }
 
+// tagRef returns full Git ref for a tag (e.g. "refs/tags/v1.0.0")
 func tagRef(tag string) string {
 	return "refs/tags/" + strings.TrimSpace(tag)
 }
 
+// branchRef returns full Git ref for a branch (e.g. "refs/heads/main")
 func branchRef(branchName string) string {
 	return "refs/heads/" + strings.TrimSpace(branchName)
 }
 
+// hasTag checks if specified Git tag exists in repository
 func hasTag(tag string) bool {
 	_, err := exec.Command("git", "rev-parse", tagRef(tag)).CombinedOutput()
 	return err == nil
 }
 
+// shaFromTag retrieves commit SHA for given Git tag
+// Panics if tag doesn't exist
 func shaFromTag(tag string) string {
 	ret, err := exec.Command("git", "rev-list", "-n", "1", tag).CombinedOutput()
 	if err != nil {
@@ -62,12 +71,14 @@ func shaFromTag(tag string) string {
 	return strings.TrimSpace(string(ret))
 }
 
+// regex creates compiled regular expression for mapped version detection in commit messages
 func regex(packageName string) *regexp.Regexp {
 	// format: Release-as: clib/semver(with v prefix)
 	// Must have one space in the end of Release-as:
 	return regexp.MustCompile(fmt.Sprintf(regexString, packageName))
 }
 
+// isValidLlpkg checks if directory contains both llpkg.cfg and llcppg.cfg
 func isValidLlpkg(files []string) bool {
 	fileMap := make(map[string]struct{}, len(files))
 
@@ -79,12 +90,14 @@ func isValidLlpkg(files []string) bool {
 	return hasLlcppg && hasLlpkg
 }
 
+// DefaultClient provides GitHub API operations for Actions workflows
 type DefaultClient struct {
 	repo   string
 	owner  string
 	client *github.Client
 }
 
+// NewDefaultClient creates configured GitHub API client with auth token
 func NewDefaultClient() *DefaultClient {
 	dc := &DefaultClient{
 		client: github.NewClient(nil).WithAuthToken(Token()),
@@ -93,6 +106,7 @@ func NewDefaultClient() *DefaultClient {
 	return dc
 }
 
+// hasBranch checks if specified branch exists in repository
 func (d *DefaultClient) hasBranch(branchName string) bool {
 	ctx, cancel := context.WithTimeout(context.TODO(), 30*time.Second)
 	defer cancel()
@@ -107,6 +121,7 @@ func (d *DefaultClient) hasBranch(branchName string) bool {
 		resp.StatusCode == http.StatusOK
 }
 
+// isAssociatedWithPullRequest checks if commit SHA is part of a closed PR
 func (d *DefaultClient) isAssociatedWithPullRequest(sha string) bool {
 	ctx, cancel := context.WithTimeout(context.TODO(), 30*time.Second)
 	defer cancel()
@@ -124,7 +139,7 @@ func (d *DefaultClient) isAssociatedWithPullRequest(sha string) bool {
 		pulls[0].GetState() == "closed"
 }
 
-// currentPRCommit returns all the commits for the current PR.
+// currentPRCommit retrieves all commits associated with current PR
 func (d *DefaultClient) currentPRCommit() []*github.RepositoryCommit {
 	eventFileName := os.Getenv("GITHUB_EVENT_PATH")
 	if eventFileName == "" {
@@ -159,6 +174,7 @@ func (d *DefaultClient) currentPRCommit() []*github.RepositoryCommit {
 	return commits
 }
 
+// checkMappedVersion ensures PR commit messages contain valid mapped version declaration
 func (d *DefaultClient) checkMappedVersion(packageName string) {
 	matchMappedVersion := regex(packageName)
 
@@ -176,6 +192,7 @@ func (d *DefaultClient) checkMappedVersion(packageName string) {
 	}
 }
 
+// commitMessage retrieves commit details by SHA
 func (d *DefaultClient) commitMessage(sha string) *github.RepositoryCommit {
 	ctx, cancel := context.WithTimeout(context.TODO(), 30*time.Second)
 	defer cancel()
@@ -187,6 +204,7 @@ func (d *DefaultClient) commitMessage(sha string) *github.RepositoryCommit {
 	return commit
 }
 
+// mappedVersion extracts mapped version from current commit message
 func (d *DefaultClient) mappedVersion() string {
 	// get message
 	message := d.commitMessage(os.Getenv("GITHUB_SHA")).GetCommit().GetMessage()
@@ -205,6 +223,7 @@ func (d *DefaultClient) mappedVersion() string {
 	return version
 }
 
+// createTag creates new Git tag in repository
 func (d *DefaultClient) createTag(tag, sha string) error {
 	ctx, cancel := context.WithTimeout(context.TODO(), 30*time.Second)
 	defer cancel()
@@ -221,6 +240,7 @@ func (d *DefaultClient) createTag(tag, sha string) error {
 	return err
 }
 
+// createBranch creates new branch pointing to specified commit SHA
 func (d *DefaultClient) createBranch(branchName, sha string) error {
 	ctx, cancel := context.WithTimeout(context.TODO(), 30*time.Second)
 	defer cancel()
@@ -236,6 +256,7 @@ func (d *DefaultClient) createBranch(branchName, sha string) error {
 	return err
 }
 
+// CheckPR validates PR changes and returns affected packages
 func (d *DefaultClient) CheckPR() []string {
 	// build a file path map
 	pathMap := map[string][]string{}
@@ -292,6 +313,7 @@ func (d *DefaultClient) CheckPR() []string {
 	return slices.Collect(maps.Keys(pathMap))
 }
 
+// Release handles version tagging and record updates after PR merge
 func (d *DefaultClient) Release() {
 	// https://docs.github.com/en/actions/writing-workflows/choosing-when-your-workflow-runs/events-that-trigger-workflows#push
 	sha := os.Getenv("GITHUB_SHA")
@@ -334,6 +356,7 @@ func (d *DefaultClient) Release() {
 	// move to website in Github Action...
 }
 
+// CreateBranchFromLabel creates release branch based on label format
 func (d *DefaultClient) CreateBranchFromLabel(labelName string) {
 	// design: branch:release-branch.{CLibraryName}/{MappedVersion}
 	branchName := strings.TrimPrefix(labelName, LabelPrefix)
