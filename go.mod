@@ -1,8 +1,6 @@
 module github.com/goplus/llpkgstore
 
-go 1.23.0
-
-toolchain go1.23.7
+go 1.22.0
 
 require (
 	github.com/google/go-github/v69 v69.2.0
