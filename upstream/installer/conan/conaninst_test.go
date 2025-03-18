@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/goplus/llpkgstore/upstream"
+	"github.com/MeteorsLiu/llpkgstore/upstream"
 )
 
 func TestConanInstaller(t *testing.T) {

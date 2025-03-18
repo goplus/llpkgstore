@@ -1,7 +1,7 @@
 package versions
 
 import (
-	"github.com/goplus/llpkgstore/metadata"
+	"github.com/MeteorsLiu/llpkgstore/metadata"
 	"golang.org/x/mod/semver"
 )
 
@@ -25,7 +25,7 @@ func (c CVerMap) LatestGoVersion() string {
 
 func (c CVerMap) Get(cver string) *metadata.VersionMapping {
 	// it's possible that we're uninitiated
-	if c == nil {
+	if len(c) == 0 {
 		return nil
 	}
 	return c[cver]

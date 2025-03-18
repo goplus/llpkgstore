@@ -41,7 +41,7 @@ func Setenv(envm map[string]string) {
 	env.Close()
 }
 
-// Setenv sets the value of the Github Action workflow output named by the key.
+// SetOutput sets the value of the Github Action workflow output named by the key.
 func SetOutput(envm map[string]string) {
 	env, err := os.OpenFile(os.Getenv("GITHUB_OUTPUT"), os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0600)
 	must(err)

@@ -9,8 +9,9 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/goplus/llpkgstore/actions/generator"
-	"github.com/goplus/llpkgstore/actions/hashutils"
+	"github.com/MeteorsLiu/llpkgstore/actions/file"
+	"github.com/MeteorsLiu/llpkgstore/actions/generator"
+	"github.com/MeteorsLiu/llpkgstore/actions/hashutils"
 )
 
 var (
@@ -79,33 +80,82 @@ func (l *llcppgGenerator) normalizeModulePath() string {
 	return goplusRepo + l.packageName
 }
 
-func (l *llcppgGenerator) Generate() error {
+func (l *llcppgGenerator) findSymbJSON() string {
+	matches, _ := filepath.Glob(filepath.Join(l.dir, "*.symb.json"))
+	if len(matches) > 0 {
+		return filepath.Base(matches[0])
+	}
+	return ""
+}
+
+func (l *llcppgGenerator) copyConfigFileTo(path string) error {
+	if l.dir == path {
+		return nil
+	}
+	err := file.CopyFile(
+		filepath.Join(l.dir, "llcppg.cfg"),
+		filepath.Join(path, "llcppg.cfg"),
+	)
+	// must stop if llcppg.cfg doesn't exist for safety
+	if err != nil {
+		return err
+	}
+	if symb := l.findSymbJSON(); symb != "" {
+		file.CopyFile(
+			filepath.Join(l.dir, symb),
+			filepath.Join(path, symb),
+		)
+	}
+	// ignore copy if file doesn't exist
+	file.CopyFile(
+		filepath.Join(l.dir, "llcppg.pub"),
+		filepath.Join(path, "llcppg.pub"),
+	)
+	return nil
+}
+
+func (l *llcppgGenerator) Generate(toDir string) error {
 	lockGoVersion()
 	defer unlockGoVersion()
 
+	path, err := filepath.Abs(toDir)
+	if err != nil {
+		return errors.Join(ErrLlcppgGenerate, err)
+	}
+	if err := l.copyConfigFileTo(path); err != nil {
+		return errors.Join(ErrLlcppgGenerate, err)
+	}
 	cmd := exec.Command("llcppg", llcppgConfigFile)
-	cmd.Dir = l.dir
-
+	cmd.Dir = path
 	// llcppg may exit with an error, which may be caused by Stderr.
 	// To avoid that case, we have to check its exit code.
 	if output, err := cmd.CombinedOutput(); isExitedUnexpectedly(err) {
 		return errors.Join(ErrLlcppgGenerate, errors.New(string(output)))
 	}
+	// check output again
+	generatedPath := filepath.Join(path, l.packageName)
+	if _, err := os.Stat(generatedPath); os.IsNotExist(err) {
+		return errors.Join(ErrLlcppgCheck, errors.New("generate fail"))
+	}
 	// edit go.mod
 	cmd = exec.Command("go", "mod", "edit", "-module", l.normalizeModulePath())
-	cmd.Dir = filepath.Join(l.dir, l.packageName)
+	cmd.Dir = generatedPath
 	cmd.Run()
 
+	// copy out the generated result
+	file.CopyFS(path, os.DirFS(generatedPath))
+
+	os.RemoveAll(generatedPath)
 	return nil
 }
 
-func (l *llcppgGenerator) Check() error {
-	// 1. llcppg will output to {CurrentDir}/{PackageName}
-	baseDir := filepath.Join(l.dir, l.packageName)
-	if _, err := os.Stat(baseDir); os.IsNotExist(err) {
-		return errors.Join(ErrLlcppgCheck, errors.New("generate fail"))
+func (l *llcppgGenerator) Check(dir string) error {
+	baseDir, err := filepath.Abs(dir)
+	if err != nil {
+		return errors.Join(ErrLlcppgCheck, err)
 	}
-	// 2. compute hash
+
+	// 1. compute hash
 	generated, err := hashutils.Dir(baseDir, canHash)
 	if err != nil {
 		return errors.Join(ErrLlcppgCheck, err)
@@ -114,7 +164,8 @@ func (l *llcppgGenerator) Check() error {
 	if err != nil {
 		return errors.Join(ErrLlcppgCheck, err)
 	}
-	// 3. check hash
+
+	// 2. check hash
 	for name, hash := range userGenerated {
 		generatedHash, ok := generated[name]
 		if !ok {
@@ -131,7 +182,7 @@ func (l *llcppgGenerator) Check() error {
 				diffTwoFiles(filepath.Join(l.dir, name), filepath.Join(baseDir, name))))
 		}
 	}
-	// 4. check missing file
+	// 3. check missing file
 	for name := range generated {
 		if _, ok := userGenerated[name]; !ok {
 			return errors.Join(ErrLlcppgCheck, fmt.Errorf("missing file: %s", name))

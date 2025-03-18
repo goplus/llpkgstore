@@ -1,6 +1,6 @@
-module github.com/goplus/llpkgstore
+module github.com/MeteorsLiu/llpkgstore
 
-go 1.23
+go 1.22.0
 
 require (
 	github.com/spf13/cobra v1.9.1

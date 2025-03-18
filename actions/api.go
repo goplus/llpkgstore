@@ -6,19 +6,17 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
-	"maps"
 	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"regexp"
-	"slices"
 	"strings"
 	"time"
 
+	"github.com/MeteorsLiu/llpkgstore/actions/versions"
+	"github.com/MeteorsLiu/llpkgstore/config"
 	"github.com/google/go-github/v69/github"
-	"github.com/goplus/llpkgstore/actions/versions"
-	"github.com/goplus/llpkgstore/config"
 	"golang.org/x/mod/semver"
 )
 
@@ -211,7 +209,7 @@ func (d *DefaultClient) mappedVersion() string {
 
 	// parse the mapped version
 	mappedVersion := regex(".*").FindString(message)
-
+	log.Println(message, mappedVersion)
 	// mapped version not found, a normal commit?
 	if mappedVersion == "" {
 		return ""
@@ -220,6 +218,7 @@ func (d *DefaultClient) mappedVersion() string {
 	if version == mappedVersion {
 		panic("invalid format")
 	}
+	log.Println(version)
 	return version
 }
 
@@ -264,6 +263,7 @@ func (d *DefaultClient) CheckPR() []string {
 		dir := filepath.Dir(path)
 		pathMap[dir] = append(pathMap[dir], filepath.Base(path))
 	}
+	var allPaths []string
 	var packages []string
 
 	for path := range pathMap {
@@ -290,6 +290,7 @@ func (d *DefaultClient) CheckPR() []string {
 			panic("directory name is not equal to package name in llpkg.cfg")
 		}
 		packages = append(packages, packageName)
+		allPaths = append(allPaths, path)
 	}
 
 	// 1. Check there's only one directory in PR
@@ -310,7 +311,7 @@ func (d *DefaultClient) CheckPR() []string {
 		d.checkMappedVersion(packageName)
 	}
 
-	return slices.Collect(maps.Keys(pathMap))
+	return allPaths
 }
 
 // Release handles version tagging and record updates after PR merge
@@ -323,18 +324,17 @@ func (d *DefaultClient) Release() {
 	// check it's associated with a pr
 	if !d.isAssociatedWithPullRequest(sha) {
 		// not a merge commit, skip it.
-		return
+		panic("not a merge request commit")
 	}
 
 	version := d.mappedVersion()
 	// skip it when no mapped version is found
 	if version == "" {
-		return
+		panic("no mapped version found in the commit message")
 	}
 
 	if hasTag(version) {
-		// tag existed already, skip it.
-		return
+		panic("tag has already existed")
 	}
 
 	if err := d.createTag(version, sha); err != nil {
@@ -350,9 +350,11 @@ func (d *DefaultClient) Release() {
 	}
 
 	// write it to llpkgstore.json
-	ver := versions.ReadVersion("llpkgstore.json")
+	ver := versions.Read("llpkgstore.json")
 	ver.Write(clib, config.Upstream.Package.Version, mappedVersion)
 
+	ret, _ := exec.Command("ls").CombinedOutput()
+	log.Println(ret)
 	// move to website in Github Action...
 }
 
@@ -378,9 +380,12 @@ func (d *DefaultClient) CreateBranchFromLabel(labelName string) {
 	// create a branch only when this version is legacy.
 	// according to branch maintenance strategy
 
-	// step 1: get latest version of the clib
-	ver := versions.ReadVersion("llpkgstore.json")
+	// get latest version of the clib
+	ver := versions.Read("llpkgstore.json")
 	latestVersion := ver.LatestGoVersion(clib)
+	if latestVersion == "" {
+		panic("no latest Go version found")
+	}
 
 	// unnecessary to create a branch if mappedVersion >= latestVersion
 	if semver.Compare(mappedVersion, latestVersion) >= 0 {

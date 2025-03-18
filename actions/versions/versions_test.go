@@ -27,7 +27,7 @@ func TestLatestVersion(t *testing.T) {
 	}
 	defer os.Remove(path)
 
-	v := ReadVersion(path)
+	v := Read(path)
 
 	if v.LatestGoVersion("cgood") != "v1.1.0" {
 		t.Errorf("unexpected latest version: want: v1.1.0 got: %s", v.LatestGoVersion("cgood"))
@@ -35,19 +35,19 @@ func TestLatestVersion(t *testing.T) {
 }
 
 func TestAppend(t *testing.T) {
-	v := ReadVersion("llpkgstore.json")
+	v := Read("llpkgstore.json")
 	defer os.Remove("llpkgstore.json")
 
 	v.Write("cjson", "1.7.18", "v1.0.0")
 	v.Write("cjson", "1.7.19", "v1.0.2")
 
-	v = ReadVersion("llpkgstore.json")
+	v = Read("llpkgstore.json")
 	//defer os.Remove("llpkgstore.json")
 
 	v.Write("cjson", "1.7.18", "v1.0.1")
 	v.Write("libxml", "1.45.1.4", "v1.0.0")
 
-	v = ReadVersion("llpkgstore.json")
+	v = Read("llpkgstore.json")
 	v.Write("libxml", "1.45.1.5", "v1.0.1")
 
 	b, _ := os.ReadFile("llpkgstore.json")

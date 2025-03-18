@@ -1,12 +1,12 @@
 package internal
 
 import (
-	"github.com/goplus/llpkgstore/actions"
+	"github.com/MeteorsLiu/llpkgstore/actions"
 	"github.com/spf13/cobra"
 )
 
 var postProcessingCmd = &cobra.Command{
-	Use:   "post-processing",
+	Use:   "postprocessing",
 	Short: "Verify a PR",
 	Long:  ``,
 	Run:   runPostProcessingCmd,

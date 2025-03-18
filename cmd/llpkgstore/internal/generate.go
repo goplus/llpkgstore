@@ -3,21 +3,34 @@ package internal
 import (
 	"log"
 	"os"
+	"os/exec"
 	"path/filepath"
 
-	"github.com/goplus/llpkgstore/actions"
-	"github.com/goplus/llpkgstore/actions/generator/llcppg"
-	"github.com/goplus/llpkgstore/config"
+	"github.com/MeteorsLiu/llpkgstore/actions/generator/llcppg"
+	"github.com/MeteorsLiu/llpkgstore/config"
 	"github.com/spf13/cobra"
 )
 
-const LLGOModuleIdentifyFile = "llpkg.cfg"
-
 var generateCmd = &cobra.Command{
-	Use:   "verfication",
+	Use:   "generate",
 	Short: "PR Verification",
 	Long:  ``,
 	Run:   runLLCppgGenerate,
+}
+
+func currentDir() string {
+	dir, err := os.Getwd()
+	if err != nil {
+		panic(err)
+	}
+	return dir
+}
+
+func removePattern(pattern string) {
+	matches, _ := filepath.Glob(pattern)
+	for _, match := range matches {
+		os.Remove(match)
+	}
 }
 
 func runLLCppgGenerateWithDir(dir string) {
@@ -29,6 +42,7 @@ func runLLCppgGenerateWithDir(dir string) {
 	if err != nil {
 		log.Fatal()
 	}
+	log.Printf("Start to generate %s", uc.Pkg.Name)
 	err = uc.Installer.Install(uc.Pkg, dir)
 	if err != nil {
 		log.Fatal(err)
@@ -36,23 +50,44 @@ func runLLCppgGenerateWithDir(dir string) {
 	// we have to feed the pc to llcppg
 	os.Setenv("PKG_CONFIG_PATH", dir)
 
+	// try llcppcfg if llcppg.cfg dones't exist
+	if _, err := os.Stat(filepath.Join(dir, "llcppg.cfg")); os.IsNotExist(err) {
+		cmd := exec.Command("llcppcfg", uc.Pkg.Name)
+		cmd.Dir = dir
+
+		ret, err := cmd.CombinedOutput()
+		if err != nil {
+			log.Fatalf("llcppcfg execute fail: %s", string(ret))
+		}
+	}
+
 	generator := llcppg.New(dir, cfg.Upstream.Package.Name)
 
-	if err := generator.Generate(); err != nil {
+	if err := generator.Generate(dir); err != nil {
 		log.Fatal(err)
 	}
-	if err := generator.Check(); err != nil {
-		log.Fatal(err)
-	}
+
+	removePattern("*.sh")
+	removePattern("*.bat")
 }
 
-func runLLCppgGenerate(_ *cobra.Command, _ []string) {
-	paths := actions.NewDefaultClient().CheckPR()
+func runLLCppgGenerate(_ *cobra.Command, args []string) {
+	exec.Command("conan", "profile", "detect").Run()
 
-	for _, path := range paths {
-		absPath, _ := filepath.Abs(path)
+	path := currentDir()
+	// by default, use current dir
+	if len(args) == 0 {
+		runLLCppgGenerateWithDir(path)
+		return
+	}
+	for _, argPath := range args {
+		absPath, err := filepath.Abs(argPath)
+		if err != nil {
+			continue
+		}
 		runLLCppgGenerateWithDir(absPath)
 	}
+
 }
 
 func init() {

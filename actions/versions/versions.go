@@ -3,14 +3,15 @@ package versions
 import (
 	"encoding/json"
 	"io"
+	"log"
 	"os"
 	"slices"
 
-	"github.com/goplus/llpkgstore/metadata"
+	"github.com/MeteorsLiu/llpkgstore/metadata"
 	"golang.org/x/mod/semver"
 )
 
-// Versions is a mapping table wrapper for Github Action only.
+// Versions is a mapping table implement for Github Action only.
 // It's recommend to use another implement in llgo for common usage.
 type Versions struct {
 	metadata.MetadataMap
@@ -19,15 +20,17 @@ type Versions struct {
 	cVerToGoVer map[string]CVerMap
 }
 
-// appendUnique adds a unique element to a slice.
-func appendUnique(arr []string, elem string) []string {
-	arr = append(arr, elem)
-	slices.Sort(arr)
-	return slices.Compact(arr)
+// appendVersion appends a version to an array, panic if the specified version has already existed.
+func appendVersion(arr []string, elem string) []string {
+	if slices.Contains(arr, elem) {
+		log.Fatalf("version %s has already existed", elem)
+	}
+	return append(arr, elem)
 }
 
-// ReadVersion reads version mappings from a file and initializes the Versions struct
-func ReadVersion(fileName string) *Versions {
+// Read reads version mappings from a file and initializes the Versions struct
+func Read(fileName string) *Versions {
+	// read or create a file
 	f, err := os.OpenFile(fileName, os.O_CREATE|os.O_RDONLY, 0644)
 	if err != nil {
 		panic(err)
@@ -76,16 +79,6 @@ func (v *Versions) queryClibVersion(clib, clibVersion string) (versions *metadat
 	if versions != nil {
 		return
 	}
-	// slow-path: parse it
-	allVersions := v.MetadataMap[clib]
-	if allVersions != nil {
-		for _, mapping := range allVersions.VersionMappings {
-			if mapping.CVersion == clibVersion {
-				versions = mapping
-				return
-			}
-		}
-	}
 	needCreate = true
 	// we find noting, make a blank one.
 	versions = &metadata.VersionMapping{CVersion: clibVersion}
@@ -117,7 +110,7 @@ func (v *Versions) LatestGoVersion(clib string) string {
 func (v *Versions) Write(clib, clibVersion, mappedVersion string) {
 	versions, needCreate := v.queryClibVersion(clib, clibVersion)
 
-	versions.GoVersions = appendUnique(versions.GoVersions, mappedVersion)
+	versions.GoVersions = appendVersion(versions.GoVersions, mappedVersion)
 
 	if needCreate {
 		if v.MetadataMap[clib] == nil {
