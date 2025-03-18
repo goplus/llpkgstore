@@ -11,16 +11,16 @@ type CmdBuilderSerilizer func(k, v string) string
 type Options func(*CmdBuilder)
 
 type CmdBuilder struct {
-	serilazier CmdBuilderSerilizer
+	serializer CmdBuilderSerilizer
 	name       string
 	subcommand string
 	args       []string
 	objs       []string
 }
 
-func WithConanSerilazier() Options {
+func WithConanSerializer() Options {
 	return func(cb *CmdBuilder) {
-		cb.serilazier = func(k, v string) string {
+		cb.serializer = func(k, v string) string {
 			return fmt.Sprintf(`--%s=%s`, k, v)
 		}
 	}
@@ -45,7 +45,7 @@ func (c *CmdBuilder) SetSubcommand(s string) {
 }
 
 func (c *CmdBuilder) SetArg(k, v string) {
-	c.args = append(c.args, c.serilazier(k, v))
+	c.args = append(c.args, c.serializer(k, v))
 }
 
 func (c *CmdBuilder) SetObj(o string) {
