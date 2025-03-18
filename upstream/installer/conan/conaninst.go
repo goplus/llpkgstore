@@ -55,7 +55,7 @@ func (c *conanInstaller) options() []string {
 func (c *conanInstaller) Install(pkg upstream.Package, outputDir string) error {
 	// Build the following command
 	// conan install --requires %s -g PkgConfigDeps --options \\*:shared=True --build=missing --output-folder=%s\
-	builder := cmdbuilder.NewCmdBuilder(cmdbuilder.WithConanSerilazier())
+	builder := cmdbuilder.NewCmdBuilder(cmdbuilder.WithConanSerializer())
 
 	builder.SetName("conan")
 	builder.SetSubcommand("install")
@@ -83,8 +83,8 @@ func (c *conanInstaller) Install(pkg upstream.Package, outputDir string) error {
 // Returns the search results text and any encountered errors.
 func (c *conanInstaller) Search(pkg upstream.Package) (string, error) {
 	// Build the following command
-	// conan serach %s -r conancenter
-	builder := cmdbuilder.NewCmdBuilder(cmdbuilder.WithConanSerilazier())
+	// conan search %s -r conancenter
+	builder := cmdbuilder.NewCmdBuilder(cmdbuilder.WithConanSerializer())
 
 	builder.SetName("conan")
 	builder.SetSubcommand("search")

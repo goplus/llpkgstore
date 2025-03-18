@@ -5,7 +5,7 @@ import (
 )
 
 func TestCmdBuilder(t *testing.T) {
-	conanBuilder := NewCmdBuilder(WithConanSerilazier())
+	conanBuilder := NewCmdBuilder(WithConanSerializer())
 
 	name := "conan"
 	subcommand := "install"
