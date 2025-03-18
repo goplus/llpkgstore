@@ -6,8 +6,8 @@ import (
 	"os/exec"
 	"path/filepath"
 
-	"github.com/MeteorsLiu/llpkgstore/actions/generator/llcppg"
-	"github.com/MeteorsLiu/llpkgstore/config"
+	"github.com/goplus/llpkgstore/actions/generator/llcppg"
+	"github.com/goplus/llpkgstore/config"
 	"github.com/spf13/cobra"
 )
 
@@ -40,7 +40,7 @@ func runLLCppgGenerateWithDir(dir string) {
 	}
 	uc, err := config.NewUpstreamFromConfig(cfg.Upstream)
 	if err != nil {
-		log.Fatal()
+		log.Fatal(err)
 	}
 	log.Printf("Start to generate %s", uc.Pkg.Name)
 	err = uc.Installer.Install(uc.Pkg, dir)

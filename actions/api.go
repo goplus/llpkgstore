@@ -14,9 +14,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/MeteorsLiu/llpkgstore/actions/versions"
-	"github.com/MeteorsLiu/llpkgstore/config"
 	"github.com/google/go-github/v69/github"
+	"github.com/goplus/llpkgstore/actions/versions"
+	"github.com/goplus/llpkgstore/config"
 	"golang.org/x/mod/semver"
 )
 
@@ -351,8 +351,6 @@ func (d *DefaultClient) Release() {
 	ver := versions.Read("llpkgstore.json")
 	ver.Write(clib, config.Upstream.Package.Version, mappedVersion)
 
-	ret, _ := exec.Command("ls").CombinedOutput()
-	log.Println(ret)
 	// move to website in Github Action...
 }
 

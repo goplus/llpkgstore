@@ -1,6 +1,6 @@
 package main
 
-import cmd "github.com/MeteorsLiu/llpkgstore/cmd/maintain/internal"
+import cmd "github.com/goplus/llpkgstore/cmd/maintain/internal"
 
 func main() {
 	cmd.Execute()
