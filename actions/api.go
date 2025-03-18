@@ -24,7 +24,7 @@ const (
 	LabelPrefix         = "branch:"
 	BranchPrefix        = "release-branch."
 	MappedVersionPrefix = "Release-as: "
-	regexString         = `Release-as:\s%s/v(?P<major>0|[1-9]\d*)\.(?P<minor>0|[1-9]\d*)\.(?P<patch>0|[1-9]\d*)(?:-(?P<prerelease>(?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*)(?:\.(?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*))*))?(?:\+(?P<buildmetadata>[0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?$`
+	regexString         = `Release-as:\s%s/v(?P<major>0|[1-9]\d*)\.(?P<minor>0|[1-9]\d*)\.(?P<patch>0|[1-9]\d*)(?:-(?P<prerelease>(?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*)(?:\.(?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*))*))?(?:\+(?P<buildmetadata>[0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?`
 )
 
 // parseMappedVersion splits the mapped version string into library name and version.
@@ -209,7 +209,6 @@ func (d *DefaultClient) mappedVersion() string {
 
 	// parse the mapped version
 	mappedVersion := regex(".*").FindString(message)
-	log.Println(message, mappedVersion)
 	// mapped version not found, a normal commit?
 	if mappedVersion == "" {
 		return ""
@@ -218,8 +217,7 @@ func (d *DefaultClient) mappedVersion() string {
 	if version == mappedVersion {
 		panic("invalid format")
 	}
-	log.Println(version)
-	return version
+	return strings.TrimSpace(version)
 }
 
 // createTag creates new Git tag in repository
