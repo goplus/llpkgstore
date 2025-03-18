@@ -76,19 +76,17 @@ func TestLlcppg(t *testing.T) {
 	os.WriteFile("testgenerate/llcppg.cfg", []byte(testLlcppgConfig), 0755)
 	os.WriteFile("testgenerate/llpkg.cfg", []byte(testLlpkgConfig), 0755)
 
-	if err := generator.Generate(); err != nil {
+	if err := generator.Generate("testgenerate"); err != nil {
 		t.Error(err)
 		return
 	}
-	// copy out
-	os.CopyFS("testgenerate", os.DirFS("testgenerate/libcjson"))
 
-	if err := generator.Check(); err != nil {
+	if err := generator.Check("testgenerate"); err != nil {
 		t.Error(err)
 		return
 	}
 	os.WriteFile("testgenerate/cJSON.go", []byte("1234"), 0755)
-	if err := generator.Check(); err == nil {
+	if err := generator.Check("testgenerate"); err == nil {
 		t.Error("unexpected check")
 		return
 	}
