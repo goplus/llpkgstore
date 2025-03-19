@@ -56,6 +56,17 @@ func TestConanSearch(t *testing.T) {
 	if !slices.Contains(ver, "cjson/1.7.18") {
 		t.Errorf("unexpected search result: %s", ver)
 	}
+
+	pkg = upstream.Package{
+		Name:    "cjson2",
+		Version: "1.7.18",
+	}
+
+	_, err := c.Search(pkg)
+	if err == nil {
+		t.Errorf("unexpected behavior: %s", err)
+	}
+
 }
 
 func verify(pkg upstream.Package, installDir string) error {
