@@ -3,7 +3,6 @@ package conan
 import (
 	"errors"
 	"fmt"
-	"regexp"
 	"strings"
 
 	"github.com/goplus/llpkgstore/internal/cmdbuilder"
@@ -107,10 +106,9 @@ func (c *conanInstaller) Search(pkg upstream.Package) ([]string, error) {
 
 	var ret []string
 
-	regex := regexp.MustCompile(fmt.Sprintf("%s/.*", pkg.Name))
-
 	for _, field := range strings.Fields(string(out)) {
-		if regex.MatchString(field) {
+		prefix, _, found := strings.Cut(field, "/")
+		if found && prefix == pkg.Name {
 			ret = append(ret, field)
 		}
 	}

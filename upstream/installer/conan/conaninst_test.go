@@ -57,6 +57,8 @@ func TestConanSearch(t *testing.T) {
 		t.Errorf("unexpected search result: %s", ver)
 	}
 
+	t.Log(ver)
+
 	pkg = upstream.Package{
 		Name:    "cjson2",
 		Version: "1.7.18",
