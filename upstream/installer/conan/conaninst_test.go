@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"testing"
 
 	"github.com/goplus/llpkgstore/upstream"
@@ -38,6 +39,36 @@ func TestConanInstaller(t *testing.T) {
 	if err := verify(pkg, tempDir); err != nil {
 		t.Errorf("Verify failed: %s", err)
 	}
+}
+
+func TestConanSearch(t *testing.T) {
+	c := &conanInstaller{
+		config: map[string]string{
+			"options": `cjson/*:utils=True`,
+		},
+	}
+
+	pkg := upstream.Package{
+		Name:    "cjson",
+		Version: "1.7.18",
+	}
+	ver, _ := c.Search(pkg)
+	if !slices.Contains(ver, "cjson/1.7.18") {
+		t.Errorf("unexpected search result: %s", ver)
+	}
+
+	t.Log(ver)
+
+	pkg = upstream.Package{
+		Name:    "cjson2",
+		Version: "1.7.18",
+	}
+
+	_, err := c.Search(pkg)
+	if err == nil {
+		t.Errorf("unexpected behavior: %s", err)
+	}
+
 }
 
 func verify(pkg upstream.Package, installDir string) error {
