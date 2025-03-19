@@ -110,7 +110,7 @@ func (c *conanInstaller) Search(pkg upstream.Package) ([]string, error) {
 	regex := regexp.MustCompile(fmt.Sprintf("%s/.*", pkg.Name))
 
 	for _, field := range strings.Fields(string(out)) {
-		if regex.Match([]byte(field)) {
+		if regex.MatchString(field) {
 			ret = append(ret, field)
 		}
 	}
