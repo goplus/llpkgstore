@@ -1,12 +1,16 @@
 package conan
 
 import (
+	"errors"
 	"fmt"
+	"regexp"
 	"strings"
 
 	"github.com/goplus/llpkgstore/internal/cmdbuilder"
 	"github.com/goplus/llpkgstore/upstream"
 )
+
+var ErrPackageNotFound = errors.New("package not found")
 
 const (
 	ConanfileTemplate = `[requires]
@@ -81,7 +85,7 @@ func (c *conanInstaller) Install(pkg upstream.Package, outputDir string) error {
 
 // Search checks Conan remote repository for the specified package availability.
 // Returns the search results text and any encountered errors.
-func (c *conanInstaller) Search(pkg upstream.Package) (string, error) {
+func (c *conanInstaller) Search(pkg upstream.Package) ([]string, error) {
 	// Build the following command
 	// conan search %s -r conancenter
 	builder := cmdbuilder.NewCmdBuilder(cmdbuilder.WithConanSerializer())
@@ -95,8 +99,21 @@ func (c *conanInstaller) Search(pkg upstream.Package) (string, error) {
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		fmt.Println(string(out))
-		return "", err
+		return nil, err
+	}
+	if strings.Contains(string(out), "not found") {
+		return nil, ErrPackageNotFound
 	}
 
-	return string(out), nil
+	var ret []string
+
+	regex := regexp.MustCompile(fmt.Sprintf("%s/.*", pkg.Name))
+
+	for _, field := range strings.Fields(string(out)) {
+		if regex.Match([]byte(field)) {
+			ret = append(ret, field)
+		}
+	}
+
+	return ret, nil
 }

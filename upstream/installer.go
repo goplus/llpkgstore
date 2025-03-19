@@ -11,5 +11,5 @@ type Installer interface {
 	Install(pkg Package, outputDir string) error
 	// Search checks remote repository for the specified package availability.
 	// Returns the search results text and any encountered errors.
-	Search(pkg Package) (string, error)
+	Search(pkg Package) ([]string, error)
 }
