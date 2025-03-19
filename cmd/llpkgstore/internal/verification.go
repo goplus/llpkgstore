@@ -7,9 +7,9 @@ import (
 	"os/exec"
 	"path/filepath"
 
-	"github.com/MeteorsLiu/llpkgstore/actions"
-	"github.com/MeteorsLiu/llpkgstore/actions/generator/llcppg"
-	"github.com/MeteorsLiu/llpkgstore/config"
+	"github.com/goplus/llpkgstore/actions"
+	"github.com/goplus/llpkgstore/actions/generator/llcppg"
+	"github.com/goplus/llpkgstore/config"
 	"github.com/spf13/cobra"
 )
 

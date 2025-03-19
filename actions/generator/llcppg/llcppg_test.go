@@ -6,7 +6,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/MeteorsLiu/llpkgstore/actions/hashutils"
+	"github.com/goplus/llpkgstore/actions/hashutils"
 )
 
 const (

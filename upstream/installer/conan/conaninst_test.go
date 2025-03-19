@@ -8,7 +8,7 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/MeteorsLiu/llpkgstore/upstream"
+	"github.com/goplus/llpkgstore/upstream"
 )
 
 func TestConanInstaller(t *testing.T) {
