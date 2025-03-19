@@ -1,7 +1,7 @@
 package internal
 
 import (
-	"github.com/goplus/llpkgstore/actions"
+	"github.com/MeteorsLiu/llpkgstore/actions"
 	"github.com/spf13/cobra"
 )
 

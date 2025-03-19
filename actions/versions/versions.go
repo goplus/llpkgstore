@@ -7,7 +7,7 @@ import (
 	"os"
 	"slices"
 
-	"github.com/goplus/llpkgstore/metadata"
+	"github.com/MeteorsLiu/llpkgstore/metadata"
 	"golang.org/x/mod/semver"
 )
 
@@ -122,4 +122,9 @@ func (v *Versions) Write(clib, clibVersion, mappedVersion string) {
 	b, _ := json.Marshal(&v.MetadataMap)
 
 	os.WriteFile(v.fileName, []byte(b), 0644)
+}
+
+func (v *Versions) String() string {
+	b, _ := json.Marshal(&v.MetadataMap)
+	return string(b)
 }

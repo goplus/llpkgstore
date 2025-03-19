@@ -14,9 +14,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/MeteorsLiu/llpkgstore/actions/versions"
+	"github.com/MeteorsLiu/llpkgstore/config"
 	"github.com/google/go-github/v69/github"
-	"github.com/goplus/llpkgstore/actions/versions"
-	"github.com/goplus/llpkgstore/config"
 	"golang.org/x/mod/semver"
 )
 
@@ -112,10 +112,8 @@ func (d *DefaultClient) hasBranch(branchName string) bool {
 	branch, resp, err := d.client.Repositories.GetBranch(
 		ctx, d.owner, d.repo, branchName, 0,
 	)
-	if err != nil {
-		panic(err)
-	}
-	return branch != nil &&
+
+	return err == nil && branch != nil &&
 		resp.StatusCode == http.StatusOK
 }
 
@@ -357,7 +355,7 @@ func (d *DefaultClient) Release() {
 // CreateBranchFromLabel creates release branch based on label format
 func (d *DefaultClient) CreateBranchFromLabel(labelName string) {
 	// design: branch:release-branch.{CLibraryName}/{MappedVersion}
-	branchName := strings.TrimPrefix(labelName, LabelPrefix)
+	branchName := strings.TrimPrefix(strings.TrimSpace(labelName), LabelPrefix)
 	if branchName == labelName {
 		panic("invalid label name format")
 	}
@@ -366,8 +364,8 @@ func (d *DefaultClient) CreateBranchFromLabel(labelName string) {
 	if d.hasBranch(branchName) {
 		return
 	}
-	version := strings.TrimPrefix(labelName, BranchPrefix)
-	if version == labelName {
+	version := strings.TrimPrefix(branchName, BranchPrefix)
+	if version == branchName {
 		panic("invalid label name format")
 	}
 	clib, mappedVersion := parseMappedVersion(version)
@@ -377,7 +375,10 @@ func (d *DefaultClient) CreateBranchFromLabel(labelName string) {
 	// according to branch maintenance strategy
 
 	// get latest version of the clib
-	ver := versions.Read("llpkgstore.json")
+	jsonFile, _ := filepath.Abs("llpkgstore.json")
+	ver := versions.Read(jsonFile)
+
+	log.Println(jsonFile, clib, ver)
 	latestVersion := ver.LatestGoVersion(clib)
 	if latestVersion == "" {
 		panic("no latest Go version found")

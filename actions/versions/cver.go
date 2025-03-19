@@ -1,7 +1,7 @@
 package versions
 
 import (
-	"github.com/goplus/llpkgstore/metadata"
+	"github.com/MeteorsLiu/llpkgstore/metadata"
 	"golang.org/x/mod/semver"
 )
 

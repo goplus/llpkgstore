@@ -1,4 +1,4 @@
-module github.com/goplus/llpkgstore
+module github.com/MeteorsLiu/llpkgstore
 
 go 1.22.0
 

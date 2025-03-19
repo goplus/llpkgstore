@@ -3,8 +3,8 @@ package config
 import (
 	"errors"
 
-	"github.com/goplus/llpkgstore/upstream"
-	"github.com/goplus/llpkgstore/upstream/installer/conan"
+	"github.com/MeteorsLiu/llpkgstore/upstream"
+	"github.com/MeteorsLiu/llpkgstore/upstream/installer/conan"
 )
 
 var ValidInstallers = []string{"conan"}
