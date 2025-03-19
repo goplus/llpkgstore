@@ -29,6 +29,7 @@ jobs:
       - name: Check Tools
         run: |
           conan -v
+          conan profile detect
       - name: Download Go modules
         run: go mod download
       - name: Test Go code
