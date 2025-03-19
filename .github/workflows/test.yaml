@@ -22,14 +22,13 @@ jobs:
         uses: actions/setup-go@v5
         with:
           go-version: ${{matrix.go}}
-      - name: Install dependencies
+      - name: Set up Conan
         run: |
           sudo apt-get install -y python3 python3-pip
           python3 -m pip install conan
-      - name: Check Tools
-        run: |
           conan -v
-          conan profile detect
+      - name: Check Conan environment
+        run: conan profile detect
       - name: Download Go modules
         run: go mod download
       - name: Test Go code
