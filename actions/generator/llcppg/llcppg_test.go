@@ -2,11 +2,15 @@ package llcppg
 
 import (
 	"encoding/hex"
+	"log"
 	"os"
+	"os/exec"
+	"path/filepath"
 	"reflect"
 	"testing"
 
 	"github.com/goplus/llpkgstore/actions/hashutils"
+	"github.com/goplus/llpkgstore/config"
 )
 
 const (
@@ -19,16 +23,16 @@ const (
   }
 }`
 	testLlcppgConfig = `{
-		"name": "libcjson",
-		"cflags": "$(pkg-config --cflags libcjson)",
-		"libs": "$(pkg-config --libs libcjson)",
-		"include": [
-			"cjson/cJSON.h"
-		],
-		"deps": null,
-		"trimPrefixes": [],
-		"cplusplus": false
-	}`
+    "name": "cjson",
+    "cflags": "$(pkg-config --cflags cjson)",
+    "libs": "$(pkg-config --libs cjson)",
+    "include": [
+            "cjson/cJSON.h"
+    ],
+    "deps": null,
+    "trimPrefixes": [],
+    "cplusplus": false
+}`
 )
 
 func TestHash(t *testing.T) {
@@ -72,21 +76,50 @@ func TestHash(t *testing.T) {
 func TestLlcppg(t *testing.T) {
 	os.Mkdir("testgenerate", 0777)
 	defer os.RemoveAll("testgenerate")
-	generator := New("testgenerate", "libcjson")
+	path, _ := filepath.Abs("testgenerate")
+	generator := New(path, "cjson")
+
 	os.WriteFile("testgenerate/llcppg.cfg", []byte(testLlcppgConfig), 0755)
 	os.WriteFile("testgenerate/llpkg.cfg", []byte(testLlpkgConfig), 0755)
 
-	if err := generator.Generate("testgenerate"); err != nil {
+	cfg, err := config.ParseLLPkgConfig("testgenerate/llpkg.cfg")
+	if err != nil {
+		log.Fatalf("parse config error: %v", err)
+	}
+	uc, err := config.NewUpstreamFromConfig(cfg.Upstream)
+	if err != nil {
+		log.Fatal(err)
+	}
+	err = uc.Installer.Install(uc.Pkg, "testgenerate")
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	// we have to feed the pc to llcppg
+	os.Setenv("PKG_CONFIG_PATH", path)
+
+	ret, _ := exec.Command("pkg-config", "--libs", "cjson").CombinedOutput()
+
+	t.Log(string(ret))
+
+	if err := generator.Generate(path); err != nil {
 		t.Error(err)
 		return
 	}
 
-	if err := generator.Check("testgenerate"); err != nil {
+	os.Mkdir(filepath.Join(path, ".generate"), 0777)
+
+	if err := generator.Generate(filepath.Join(path, ".generate")); err != nil {
+		t.Error(err)
+		return
+	}
+
+	if err := generator.Check(filepath.Join(path, ".generate")); err != nil {
 		t.Error(err)
 		return
 	}
 	os.WriteFile("testgenerate/cJSON.go", []byte("1234"), 0755)
-	if err := generator.Check("testgenerate"); err == nil {
+	if err := generator.Check(filepath.Join(path, ".generate")); err == nil {
 		t.Error("unexpected check")
 		return
 	}
