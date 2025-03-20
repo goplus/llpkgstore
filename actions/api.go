@@ -119,7 +119,6 @@ func (d *DefaultClient) removeLabel(labelName string) {
 	if err != nil {
 		panic(err)
 	}
-	return
 }
 
 // checkMappedVersion ensures PR commit messages contain valid mapped version declaration
