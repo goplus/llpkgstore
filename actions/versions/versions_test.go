@@ -3,7 +3,7 @@ package versions
 import (
 	"bytes"
 	"os"
-	"reflect"
+	"slices"
 	"testing"
 )
 
@@ -30,11 +30,11 @@ func TestCVersions(t *testing.T) {
 
 	v := Read(path)
 
-	if !reflect.DeepEqual(v.GoVersions("cgood"), []string{"v0.1.0", "v0.1.1", "v1.1.0"}) {
+	if !slices.Equal(v.GoVersions("cgood"), []string{"v0.1.0", "v0.1.1", "v1.1.0"}) {
 		t.Errorf("unexpected goversion: want: %v got: %v", []string{"v0.1.0", "v0.1.1", "v1.1.0"}, v.GoVersions("cgood"))
 	}
 
-	if !reflect.DeepEqual(v.CVersions("cgood"), []string{"v1.3.0", "v1.3.1"}) {
+	if !slices.Equal(v.CVersions("cgood"), []string{"v1.3.0", "v1.3.1"}) {
 		t.Errorf("unexpected cversion: want: %v got: %v", []string{"v1.3.0", "v1.3.1"}, v.CVersions("cgood"))
 	}
 
