@@ -1,20 +1,24 @@
 package cmdbuilder
 
 import (
+	"slices"
 	"testing"
 )
 
 func TestCmdBuilder(t *testing.T) {
 	conanBuilder := NewCmdBuilder(WithConanSerializer())
 
+	// Provided
 	name := "conan"
 	subcommand := "install"
-	argMap := map[string]string{
+	inputArgMap := map[string]string{
 		"requires": "cjson/1.7.18",
 		"options":  `*:shared=True cjson/*:utils=True`,
 		"build":    "missing",
 	}
-	args := []string{
+
+	// Expected
+	expectedArgs := []string{
 		"--requires=cjson/1.7.18",
 		`--options=*:shared=True cjson/*:utils=True`,
 		"--build=missing",
@@ -22,8 +26,8 @@ func TestCmdBuilder(t *testing.T) {
 
 	conanBuilder.SetName(name)
 	conanBuilder.SetSubcommand(subcommand)
-	for k, v := range argMap {
-		conanBuilder.SetArg(k, v)
+	for name, value := range inputArgMap {
+		conanBuilder.SetArg(name, value)
 	}
 
 	if conanBuilder.Name() != name {
@@ -34,9 +38,9 @@ func TestCmdBuilder(t *testing.T) {
 		t.Errorf("Unexpected subcommand: %s", conanBuilder.Subcommand())
 	}
 
-	for k, v := range args {
-		if conanBuilder.args[k] != v {
-			t.Errorf("Unexpected arg: %s", conanBuilder.args[k])
+	for _, arg := range expectedArgs {
+		if !slices.Contains(conanBuilder.Args(), arg) {
+			t.Errorf("No expected arg: %s", arg)
 		}
 	}
 }
