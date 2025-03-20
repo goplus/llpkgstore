@@ -85,6 +85,22 @@ func (v *Versions) queryClibVersion(clib, clibVersion string) (versions *metadat
 	return
 }
 
+func (v *Versions) CVersions(clib string) []string {
+	return v.cVerToGoVer[clib].Versions()
+}
+
+func (v *Versions) GoVersions(clib string) []string {
+	return v.cVerToGoVer[clib].GoVersions()
+}
+
+func (v *Versions) LatestGoVersionForCVersion(clib, cver string) string {
+	return v.cVerToGoVer[clib].LatestGoVersionForCVersion(cver)
+}
+
+func (v *Versions) SearchBySemVer(clib, semver string) string {
+	return v.cVerToGoVer[clib].SearchBySemVer(semver)
+}
+
 // LatestGoVersion returns the latest Go version associated with the given C library
 func (v *Versions) LatestGoVersion(clib string) string {
 	clibVer := v.cVerToGoVer[clib].LatestGoVersion()

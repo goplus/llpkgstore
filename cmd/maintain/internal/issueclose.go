@@ -14,10 +14,7 @@ var issueCloseCmd = &cobra.Command{
 }
 
 func runIssueCloseCmd(cmd *cobra.Command, args []string) {
-	if labelName == "" {
-		panic("no label name")
-	}
-	actions.NewDefaultClient().CreateBranchFromLabel(labelName)
+	actions.NewDefaultClient().CleanResource()
 }
 
 func init() {

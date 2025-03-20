@@ -3,12 +3,9 @@ package actions
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
-	"log"
 	"net/http"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -17,7 +14,6 @@ import (
 	"github.com/google/go-github/v69/github"
 	"github.com/goplus/llpkgstore/actions/versions"
 	"github.com/goplus/llpkgstore/config"
-	"golang.org/x/mod/semver"
 )
 
 const (
@@ -27,65 +23,11 @@ const (
 	regexString         = `Release-as:\s%s/v(?P<major>0|[1-9]\d*)\.(?P<minor>0|[1-9]\d*)\.(?P<patch>0|[1-9]\d*)(?:-(?P<prerelease>(?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*)(?:\.(?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*))*))?(?:\+(?P<buildmetadata>[0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?`
 )
 
-// parseMappedVersion splits the mapped version string into library name and version.
-// Input format: "clib/semver" where semver starts with 'v'
-// Panics if input format is invalid or version isn't valid semantic version
-func parseMappedVersion(version string) (clib, mappedVersion string) {
-	arr := strings.Split(version, "/")
-	if len(arr) != 2 {
-		panic("invalid mapped version format")
-	}
-	clib, mappedVersion = arr[0], arr[1]
-
-	if !semver.IsValid(mappedVersion) {
-		panic("invalid mapped version format: mappedVersion is not a semver")
-	}
-	return
-}
-
-// tagRef returns full Git ref for a tag (e.g. "refs/tags/v1.0.0")
-func tagRef(tag string) string {
-	return "refs/tags/" + strings.TrimSpace(tag)
-}
-
-// branchRef returns full Git ref for a branch (e.g. "refs/heads/main")
-func branchRef(branchName string) string {
-	return "refs/heads/" + strings.TrimSpace(branchName)
-}
-
-// hasTag checks if specified Git tag exists in repository
-func hasTag(tag string) bool {
-	_, err := exec.Command("git", "rev-parse", tagRef(tag)).CombinedOutput()
-	return err == nil
-}
-
-// shaFromTag retrieves commit SHA for given Git tag
-// Panics if tag doesn't exist
-func shaFromTag(tag string) string {
-	ret, err := exec.Command("git", "rev-list", "-n", "1", tag).CombinedOutput()
-	if err != nil {
-		log.Fatalf("cannot find a tag: %s", tag)
-	}
-	return strings.TrimSpace(string(ret))
-}
-
 // regex creates compiled regular expression for mapped version detection in commit messages
 func regex(packageName string) *regexp.Regexp {
 	// format: Release-as: clib/semver(with v prefix)
 	// Must have one space in the end of Release-as:
 	return regexp.MustCompile(fmt.Sprintf(regexString, packageName))
-}
-
-// isValidLlpkg checks if directory contains both llpkg.cfg and llcppg.cfg
-func isValidLlpkg(files []string) bool {
-	fileMap := make(map[string]struct{}, len(files))
-
-	for _, file := range files {
-		fileMap[file] = struct{}{}
-	}
-	_, hasLlpkg := fileMap["llpkg.cfg"]
-	_, hasLlcppg := fileMap["llcppg.cfg"]
-	return hasLlcppg && hasLlpkg
 }
 
 // DefaultClient provides GitHub API operations for Actions workflows
@@ -137,24 +79,7 @@ func (d *DefaultClient) isAssociatedWithPullRequest(sha string) bool {
 
 // currentPRCommit retrieves all commits associated with current PR
 func (d *DefaultClient) currentPRCommit() []*github.RepositoryCommit {
-	eventFileName := os.Getenv("GITHUB_EVENT_PATH")
-	if eventFileName == "" {
-		panic("cannot get GITHUB_EVENT_PATH")
-	}
-	event, err := os.ReadFile(eventFileName)
-	if err != nil {
-		panic(err)
-	}
-	var m map[string]any
-	json.Unmarshal([]byte(event), &m)
-
-	if len(m) == 0 {
-		panic("cannot parse GITHUB_EVENT_PATH")
-	}
-	pullRequest, ok := m["pull_request"].(map[string]any)
-	if !ok {
-		panic("cannot parse GITHUB_EVENT_PATH pull_request")
-	}
+	pullRequest := PullRequestEvent()
 	prNumber := int(pullRequest["number"].(float64))
 
 	ctx, cancel := context.WithTimeout(context.TODO(), 30*time.Second)
@@ -170,22 +95,50 @@ func (d *DefaultClient) currentPRCommit() []*github.RepositoryCommit {
 	return commits
 }
 
+func (d *DefaultClient) allCommits() []*github.RepositoryCommit {
+	ctx, cancel := context.WithTimeout(context.TODO(), 30*time.Second)
+	defer cancel()
+	// use authorized API to avoid Github RateLimit
+	commits, _, err := d.client.Repositories.ListCommits(
+		ctx, d.owner, d.repo,
+		&github.CommitsListOptions{},
+	)
+	if err != nil {
+		panic(err)
+	}
+	return commits
+}
+
+func (d *DefaultClient) removeLabel(labelName string) {
+	ctx, cancel := context.WithTimeout(context.TODO(), 30*time.Second)
+	defer cancel()
+	// use authorized API to avoid Github RateLimit
+	_, err := d.client.Issues.DeleteLabel(
+		ctx, d.owner, d.repo, labelName,
+	)
+	if err != nil {
+		panic(err)
+	}
+	return
+}
+
 // checkMappedVersion ensures PR commit messages contain valid mapped version declaration
-func (d *DefaultClient) checkMappedVersion(packageName string) {
+func (d *DefaultClient) checkMappedVersion(packageName string) (mappedVersion string) {
 	matchMappedVersion := regex(packageName)
 
-	found := false
 	for _, commit := range d.currentPRCommit() {
 		message := commit.GetCommit().GetMessage()
-		if matchMappedVersion.Match([]byte(message)) {
-			found = true
+		if mappedVersion = matchMappedVersion.FindString(message); mappedVersion != "" {
+			// remove space, of course
+			mappedVersion = strings.TrimSpace(mappedVersion)
 			break
 		}
 	}
 
-	if !found {
+	if mappedVersion == "" {
 		panic("no MappedVersion found in the PR")
 	}
+	return
 }
 
 // commitMessage retrieves commit details by SHA
@@ -251,6 +204,24 @@ func (d *DefaultClient) createBranch(branchName, sha string) error {
 	return err
 }
 
+func (d *DefaultClient) removeBranch(branchName string) error {
+	ctx, cancel := context.WithTimeout(context.TODO(), 30*time.Second)
+	defer cancel()
+
+	_, err := d.client.Git.DeleteRef(ctx, d.owner, d.repo, branchRef(branchName))
+
+	return err
+}
+
+func (d *DefaultClient) checkVersion(ver *versions.Versions, cfg config.LLPkgConfig) {
+	// 4. Check MappedVersion
+	version := d.checkMappedVersion(cfg.Upstream.Package.Name)
+	_, mappedVersion := parseMappedVersion(version)
+
+	// 5. Check version is valid
+	checkLegacyVersion(ver, cfg, mappedVersion)
+}
+
 // CheckPR validates PR changes and returns affected packages
 func (d *DefaultClient) CheckPR() []string {
 	// build a file path map
@@ -260,7 +231,8 @@ func (d *DefaultClient) CheckPR() []string {
 		pathMap[dir] = append(pathMap[dir], filepath.Base(path))
 	}
 	var allPaths []string
-	var packages []string
+
+	ver := versions.Read("llpkgstore.json")
 
 	for path := range pathMap {
 		files := pathMap[path]
@@ -285,7 +257,8 @@ func (d *DefaultClient) CheckPR() []string {
 		if packageName != path {
 			panic("directory name is not equal to package name in llpkg.cfg")
 		}
-		packages = append(packages, packageName)
+		d.checkVersion(ver, cfg)
+
 		allPaths = append(allPaths, path)
 	}
 
@@ -297,14 +270,6 @@ func (d *DefaultClient) CheckPR() []string {
 	// 2. Check config files(llpkg.cfg and llcppg.cfg)
 	if len(pathMap) == 0 {
 		panic("no valid config files, llpkg.cfg and llcppg.cfg must exist")
-	}
-
-	// 4. Check MappedVersion
-	//
-	// it should be one package name at the current stage,
-	// however, in the future, it may allow multiple packages.
-	for _, packageName := range packages {
-		d.checkMappedVersion(packageName)
 	}
 
 	return allPaths
@@ -349,6 +314,10 @@ func (d *DefaultClient) Release() {
 	ver := versions.Read("llpkgstore.json")
 	ver.Write(clib, config.Upstream.Package.Version, mappedVersion)
 
+	// we have finished tagging the commit, safe to remove the branch
+	if branchName, isLegacy := isLegacyVersion(); isLegacy {
+		d.removeBranch(branchName)
+	}
 	// move to website in Github Action...
 }
 
@@ -368,28 +337,64 @@ func (d *DefaultClient) CreateBranchFromLabel(labelName string) {
 	if version == branchName {
 		panic("invalid label name format")
 	}
-	clib, mappedVersion := parseMappedVersion(version)
+	clib, _ := parseMappedVersion(version)
 	// slow-path: check the condition if we can create a branch
 	//
 	// create a branch only when this version is legacy.
 	// according to branch maintenance strategy
 
 	// get latest version of the clib
-	jsonFile, _ := filepath.Abs("llpkgstore.json")
-	ver := versions.Read(jsonFile)
+	ver := versions.Read("llpkgstore.json")
 
-	log.Println(jsonFile, clib, ver)
-	latestVersion := ver.LatestGoVersion(clib)
-	if latestVersion == "" {
-		panic("no latest Go version found")
+	cversions := ver.CVersions(clib)
+	if len(cversions) == 0 {
+		panic("no clib found")
 	}
 
-	// unnecessary to create a branch if mappedVersion >= latestVersion
-	if semver.Compare(mappedVersion, latestVersion) >= 0 {
-		return
+	if !versions.IsSemver(cversions) {
+		panic("c version dones't follow semver, skip maintaining.")
 	}
 
 	if err := d.createBranch(branchName, shaFromTag(version)); err != nil {
 		panic(err)
 	}
+}
+
+func (d *DefaultClient) CleanResource() {
+	issueEvent := IssueEvent()
+
+	issueNumber := int(issueEvent["number"].(float64))
+	regex := regexp.MustCompile(fmt.Sprintf(`(f|F)ix.*#%d`, issueNumber))
+
+	found := false
+	for _, commit := range d.allCommits() {
+		message := commit.Commit.GetMessage()
+
+		if regex.MatchString(message) &&
+			d.isAssociatedWithPullRequest(commit.GetSHA()) {
+			found = true
+			break
+		}
+	}
+
+	if !found {
+		panic("current issue isn't closed by merged PR.")
+	}
+
+	var labelName string
+
+	for _, labels := range issueEvent["labels"].([]map[string]any) {
+		label := labels["name"].(string)
+
+		if strings.HasPrefix(label, BranchPrefix) {
+			labelName = label
+			break
+		}
+	}
+
+	if labelName == "" {
+		panic("current issue hasn't labelled, this should not happen")
+	}
+
+	d.removeLabel(labelName)
 }

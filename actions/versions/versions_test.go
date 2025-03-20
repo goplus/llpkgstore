@@ -3,8 +3,50 @@ package versions
 import (
 	"bytes"
 	"os"
+	"reflect"
 	"testing"
 )
+
+func TestCVersions(t *testing.T) {
+	b := []byte(`{
+		"cgood": {
+			"versions" : [{
+				"c": "1.3",
+				"go": ["v0.1.0", "v0.1.1"]
+			},
+			{
+				"c": "1.3.1",
+				"go": ["v1.1.0"]
+			}]
+		}
+	}`)
+	path := "ttt.json"
+	err := os.WriteFile(path, []byte(b), 0755)
+	if err != nil {
+		t.Error(err)
+		return
+	}
+	defer os.Remove(path)
+
+	v := Read(path)
+
+	if !reflect.DeepEqual(v.GoVersions("cgood"), []string{"v0.1.0", "v0.1.1", "v1.1.0"}) {
+		t.Errorf("unexpected goversion: want: %v got: %v", []string{"v0.1.0", "v0.1.1", "v1.1.0"}, v.GoVersions("cgood"))
+	}
+
+	if !reflect.DeepEqual(v.CVersions("cgood"), []string{"v1.3.0", "v1.3.1"}) {
+		t.Errorf("unexpected cversion: want: %v got: %v", []string{"v1.3.0", "v1.3.1"}, v.CVersions("cgood"))
+	}
+
+	if v.LatestGoVersionForCVersion("cgood", "1.3") != "v0.1.1" {
+		t.Errorf("unexpected latest Go version: want: %v got: %v", "v0.1.1", v.LatestGoVersionForCVersion("cgood", "1.3"))
+	}
+
+	if v.SearchBySemVer("cgood", "v1.3.0") != "1.3" {
+		t.Errorf("unexpected search by semver result: want: %v got: %v", "1.3", v.SearchBySemVer("cgood", "v1.3.0"))
+
+	}
+}
 
 func TestLatestVersion(t *testing.T) {
 	b := []byte(`{
