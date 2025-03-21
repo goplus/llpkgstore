@@ -51,10 +51,9 @@ func CopyFS(dir string, fsys fs.FS) error {
 		if err != nil {
 			return err
 		}
-		w, err := os.OpenFile(newPath, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0666|info.Mode()&0777)
+		w, err := os.OpenFile(newPath, os.O_TRUNC|os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0666|info.Mode()&0777)
 		if err != nil {
-			// skip this file if it has already existed.
-			return nil
+			return err
 		}
 
 		if _, err := io.Copy(w, r); err != nil {
@@ -65,6 +64,14 @@ func CopyFS(dir string, fsys fs.FS) error {
 	})
 }
 
+// CopyFile copies a file from the source path 'from' to the destination path 'to'.
+//
+// It opens the source file, creates the destination file (overwriting if exists),
+// and copies the contents. The destination file permissions are determined by
+// the os.Create default mode modified by any umask.
+//
+// Returns an error if opening the source, creating the destination, or copying
+// the contents fails.
 func CopyFile(from, to string) (err error) {
 	r, err := os.Open(from)
 	if err != nil {

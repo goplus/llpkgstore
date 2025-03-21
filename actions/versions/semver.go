@@ -2,6 +2,8 @@ package versions
 
 import "golang.org/x/mod/semver"
 
+// Package versions provides utilities for working with semantic versioning.
+
 // ByVersionDescending implements [sort.Interface] for sorting semantic version strings in descending order.
 type ByVersionDescending []string
 
@@ -16,6 +18,7 @@ func (vs ByVersionDescending) Less(i, j int) bool {
 	return vs[i] > vs[j]
 }
 
+// fillVersionPrefix ensures version strings start with 'v' prefix
 func fillVersionPrefix(version string) string {
 	if version == "" {
 		panic("invalid empty version")
@@ -26,6 +29,7 @@ func fillVersionPrefix(version string) string {
 	return "v" + version
 }
 
+// ToSemVer converts a version string to canonical semantic version format
 func ToSemVer(version string) string {
 	semver := semver.Canonical(fillVersionPrefix(version))
 	if semver == "" {
@@ -34,6 +38,7 @@ func ToSemVer(version string) string {
 	return semver
 }
 
+// IsSemver checks if all provided version strings are valid semantic versions
 func IsSemver(cversions []string) bool {
 	for _, cversion := range cversions {
 		if !semver.IsValid(cversion) {

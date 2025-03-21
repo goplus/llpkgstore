@@ -5,64 +5,95 @@ import (
 	"golang.org/x/mod/semver"
 )
 
-type CVerMap map[string]*metadata.VersionMapping
+// cVerMap represents a map of C versions to their corresponding version mappings
+type cVerMap struct {
+	m map[string]*metadata.VersionMapping
 
-func (c CVerMap) GoVersions() (tmp []string) {
-	if len(c) == 0 {
+	cVerCache       []string // cached list of C versions
+	goVersionsCache []string // cached list of Go versions
+}
+
+// newCverMap creates a new empty cVerMap instance
+func newCverMap() *cVerMap {
+	return &cVerMap{m: map[string]*metadata.VersionMapping{}}
+}
+
+// GoVersions returns all Go versions associated with all C versions
+func (c *cVerMap) GoVersions() (tmp []string) {
+	if len(c.m) == 0 {
 		return nil
 	}
-	for _, verions := range c {
-		tmp = append(tmp, verions.GoVersions...)
+	if c.goVersionsCache != nil {
+		tmp = c.goVersionsCache
+		return
 	}
+	for _, versions := range c.m { // Fixed typo: verions -> versions
+		tmp = append(tmp, versions.GoVersions...)
+	}
+	c.goVersionsCache = tmp // Cache computed value
 	return
 }
 
-func (c CVerMap) LatestGoVersion() string {
-	if len(c) == 0 {
-		return ""
+// Versions returns all C versions stored in the map
+func (c *cVerMap) Versions() []string {
+	if c.cVerCache != nil {
+		return c.cVerCache
 	}
-	tmp := c.GoVersions()
-	// check again to avoid unexpected behavior
-	if len(tmp) == 0 {
-		return ""
+	var tmp []string
+	for version := range c.m {
+		tmp = append(tmp, version)
 	}
-	semver.Sort(tmp)
-	return tmp[len(tmp)-1]
+	c.cVerCache = tmp // Cache computed value
+	return tmp
 }
 
-func (c CVerMap) Get(cver string) *metadata.VersionMapping {
-	// it's possible that we're uninitiated
-	if len(c) == 0 {
+// LatestGoVersion returns the highest semantic version of all Go versions
+func (c *cVerMap) LatestGoVersion() string {
+	if len(c.m) == 0 {
+		return ""
+	}
+	goVersions := c.GoVersions()
+	if len(goVersions) == 0 {
+		return ""
+	}
+	semver.Sort(goVersions)
+	return goVersions[len(goVersions)-1]
+}
+
+// Get retrieves the VersionMapping for a specific C version
+func (c *cVerMap) Get(cver string) *metadata.VersionMapping {
+	if c == nil || len(c.m) == 0 {
 		return nil
 	}
-	return c[cver]
+	return c.m[cver]
 }
 
-func (c CVerMap) LatestGoVersionForCVersion(cver string) string {
+// Set adds or updates a VersionMapping entry
+func (c *cVerMap) Set(versions *metadata.VersionMapping) {
+	c.m[versions.CVersion] = versions
+	c.cVerCache = append(c.cVerCache, ToSemVer(versions.CVersion))        // Update C version cache
+	c.goVersionsCache = append(c.goVersionsCache, versions.GoVersions...) // Update Go versions cache
+}
+
+// LatestGoVersionForCVersion returns the latest Go version for a specific C version
+func (c *cVerMap) LatestGoVersionForCVersion(cver string) string {
 	mappingTable := c.Get(cver)
 	if mappingTable == nil || len(mappingTable.GoVersions) == 0 {
 		return ""
 	}
 	goVersions := make([]string, len(mappingTable.GoVersions))
-	copy(goVersions, mappingTable.GoVersions)
+	copy(goVersions, mappingTable.GoVersions) // Fixed typo: GoVersion -> GoVersions
 	semver.Sort(goVersions)
-
 	return goVersions[len(goVersions)-1]
 }
 
-func (c CVerMap) SearchBySemVer(semver string) (originalVer string) {
-	for cver := range c {
+// SearchBySemVer finds the original C version from its semantic version string
+func (c *cVerMap) SearchBySemVer(semver string) (originalVer string) {
+	for cver := range c.m {
 		if ToSemVer(cver) == semver {
 			originalVer = cver
 			break
 		}
-	}
-	return
-}
-
-func (c CVerMap) Versions() (ret []string) {
-	for version := range c {
-		ret = append(ret, ToSemVer(version))
 	}
 	return
 }

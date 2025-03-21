@@ -17,7 +17,7 @@ type Versions struct {
 	metadata.MetadataMap
 
 	fileName    string
-	cVerToGoVer map[string]CVerMap
+	cVerToGoVer map[string]*cVerMap
 }
 
 // appendVersion appends a version to an array, panic if the specified version has already existed.
@@ -51,7 +51,7 @@ func Read(fileName string) *Versions {
 	v := &Versions{
 		MetadataMap: m,
 		fileName:    f.Name(),
-		cVerToGoVer: map[string]CVerMap{},
+		cVerToGoVer: map[string]*cVerMap{},
 	}
 	v.build()
 	return v
@@ -61,11 +61,11 @@ func Read(fileName string) *Versions {
 func (v *Versions) build() {
 	// O(n)
 	for clib := range v.MetadataMap {
-		cverMap := CVerMap{}
+		cverMap := newCverMap()
 
 		versions := v.MetadataMap[clib]
 		for _, version := range versions.VersionMappings {
-			cverMap[version.CVersion] = version
+			cverMap.Set(version)
 		}
 
 		v.cVerToGoVer[clib] = cverMap
@@ -104,6 +104,7 @@ func (v *Versions) SearchBySemVer(clib, semver string) string {
 // LatestGoVersion returns the latest Go version associated with the given C library
 func (v *Versions) LatestGoVersion(clib string) string {
 	clibVer := v.cVerToGoVer[clib].LatestGoVersion()
+	log.Println(clibVer)
 	if clibVer != "" {
 		return clibVer
 	}
