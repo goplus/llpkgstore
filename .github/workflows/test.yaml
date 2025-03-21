@@ -52,7 +52,7 @@ jobs:
       - name: Check Conan environment
         run: conan profile detect
       - name: Download Go modules
-        run: go mod tidy
+        run: go mod download
       - name: Test Go code
         run: go test -v -race -covermode atomic -coverprofile coverage.out ./...
       - name: Upload code coverage
