@@ -91,8 +91,6 @@ func hasTag(tag string) bool {
 // shaFromTag retrieves commit SHA for given Git tag
 // Panics if tag doesn't exist
 func shaFromTag(tag string) string {
-	ret, _ := exec.Command("git", "tag").CombinedOutput()
-	log.Println(string(ret))
 	ret, err := exec.Command("git", "rev-list", "-n", "1", tag).CombinedOutput()
 	if err != nil {
 		log.Fatalf("cannot find a tag: %s %s", tag, string(ret))
@@ -128,20 +126,7 @@ func isValidLlpkg(files []string) bool {
 	return hasLlcppg && hasLlpkg
 }
 
-// isLegacyVersion reports current PR stands for legacy version
-func isLegacyVersion() (branchName string, legacy bool) {
-	pullRequest := PullRequestEvent()
-
-	// unnecessary to check type, because currentPRCommit has been checked.
-	base := pullRequest["base"].(map[string]any)
-	refName := base["ref"].(string)
-
-	legacy = strings.HasPrefix(refName, BranchPrefix)
-	branchName = refName
-	return
-}
-
-func checkLegacyVersion(ver *versions.Versions, cfg config.LLPkgConfig, mappedVersion string) {
+func checkLegacyVersion(ver *versions.Versions, cfg config.LLPkgConfig, mappedVersion string, isLegacy bool) {
 	if slices.Contains(ver.GoVersions(cfg.Upstream.Package.Name), mappedVersion) {
 		panic("repeat semver")
 	}
@@ -156,8 +141,6 @@ func checkLegacyVersion(ver *versions.Versions, cfg config.LLPkgConfig, mappedVe
 	sort.Sort(versions.ByVersionDescending(vers))
 
 	latestVersion := vers[0]
-	// case1: if this is a legacy version, it MUST be not in main
-	_, isLegacy := isLegacyVersion()
 
 	if semver.Compare(currentVersion, latestVersion) < 0 && !isLegacy {
 		panic("legacy version MUST not submit to main branch")
@@ -261,4 +244,12 @@ func Token() string {
 		panic("no GH_TOKEN")
 	}
 	return token
+}
+
+func LatestCommitSHA() string {
+	sha := os.Getenv("GITHUB_SHA")
+	if sha == "" {
+		panic("no GITHUB_SHA found")
+	}
+	return sha
 }

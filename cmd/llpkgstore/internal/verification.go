@@ -29,7 +29,7 @@ func runLLCppgVerificationWithDir(dir string) {
 	}
 	uc, err := config.NewUpstreamFromConfig(cfg.Upstream)
 	if err != nil {
-		log.Fatal()
+		log.Fatal(err)
 	}
 	err = uc.Installer.Install(uc.Pkg, dir)
 	if err != nil {

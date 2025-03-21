@@ -23,7 +23,7 @@ var runCmd = &cobra.Command{
 		var paths []string
 		pathEnv := os.Getenv("LLPKG_PATH")
 		if pathEnv != "" {
-			json.Unmarshal([]byte(pathEnv), &pathEnv)
+			json.Unmarshal([]byte(pathEnv), &paths)
 		} else {
 			// not in github action
 			paths = append(paths, currentDir())

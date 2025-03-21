@@ -47,8 +47,8 @@ func RunGenPkgDemo(demoRoot string) {
 
 func RunAllGenPkgDemos(baseDir string) {
 	fmt.Printf("Starting generated package tests in directory: %s\n", baseDir)
-
-	RunGenPkgDemo(baseDir)
+	absDir, _ := filepath.Abs(baseDir)
+	RunGenPkgDemo(absDir)
 }
 
 func runCommand(dir, command string, args ...string) error {

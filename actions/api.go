@@ -5,7 +5,6 @@ import (
 	"context"
 	"fmt"
 	"net/http"
-	"os"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -59,8 +58,7 @@ func (d *DefaultClient) hasBranch(branchName string) bool {
 		resp.StatusCode == http.StatusOK
 }
 
-// isAssociatedWithPullRequest checks if commit SHA is part of a closed PR
-func (d *DefaultClient) isAssociatedWithPullRequest(sha string) bool {
+func (d *DefaultClient) associatedWithPullRequest(sha string) []*github.PullRequest {
 	ctx, cancel := context.WithTimeout(context.TODO(), 30*time.Second)
 	defer cancel()
 
@@ -70,11 +68,39 @@ func (d *DefaultClient) isAssociatedWithPullRequest(sha string) bool {
 	if err != nil {
 		panic(err)
 	}
+	return pulls
+}
+
+// isAssociatedWithPullRequest checks if commit SHA is part of a closed PR
+func (d *DefaultClient) isAssociatedWithPullRequest(sha string) bool {
+	pulls := d.associatedWithPullRequest(sha)
 	// don't use GetMerge, because GetMerge may be a mistake.
 	// sometime, when a pull request is merged, GetMerge still returns false.
 	// so checking pull request state is more accurate.
 	return len(pulls) > 0 &&
 		pulls[0].GetState() == "closed"
+}
+
+// isLegacyVersion reports current PR stands for legacy version
+func (d *DefaultClient) isLegacyVersion() (branchName string, legacy bool) {
+	pullRequest, ok := GithubEvent()["pull_request"].(map[string]any)
+	var refName string
+	if !ok {
+		// if this actions is not triggered by pull request, fallback to call API.
+		pulls := d.associatedWithPullRequest(LatestCommitSHA())
+		if len(pulls) == 0 {
+			panic("this commit is not associated with a pull request, this should not happen")
+		}
+		refName = pulls[0].GetBase().GetRef()
+	} else {
+		// unnecessary to check type, because currentPRCommit has been checked.
+		base := pullRequest["base"].(map[string]any)
+		refName = base["ref"].(string)
+	}
+
+	legacy = strings.HasPrefix(refName, BranchPrefix)
+	branchName = refName
+	return
 }
 
 // currentPRCommit retrieves all commits associated with current PR
@@ -155,7 +181,7 @@ func (d *DefaultClient) commitMessage(sha string) *github.RepositoryCommit {
 // mappedVersion extracts mapped version from current commit message
 func (d *DefaultClient) mappedVersion() string {
 	// get message
-	message := d.commitMessage(os.Getenv("GITHUB_SHA")).GetCommit().GetMessage()
+	message := d.commitMessage(LatestCommitSHA()).GetCommit().GetMessage()
 
 	// parse the mapped version
 	mappedVersion := regex(".*").FindString(message)
@@ -218,7 +244,8 @@ func (d *DefaultClient) checkVersion(ver *versions.Versions, cfg config.LLPkgCon
 	_, mappedVersion := parseMappedVersion(version)
 
 	// 5. Check version is valid
-	checkLegacyVersion(ver, cfg, mappedVersion)
+	_, isLegacy := d.isLegacyVersion()
+	checkLegacyVersion(ver, cfg, mappedVersion, isLegacy)
 }
 
 // CheckPR validates PR changes and returns affected packages
@@ -277,10 +304,7 @@ func (d *DefaultClient) CheckPR() []string {
 // Release handles version tagging and record updates after PR merge
 func (d *DefaultClient) Release() {
 	// https://docs.github.com/en/actions/writing-workflows/choosing-when-your-workflow-runs/events-that-trigger-workflows#push
-	sha := os.Getenv("GITHUB_SHA")
-	if sha == "" {
-		panic("no GITHUB_SHA found")
-	}
+	sha := LatestCommitSHA()
 	// check it's associated with a pr
 	if !d.isAssociatedWithPullRequest(sha) {
 		// not a merge commit, skip it.
@@ -314,7 +338,7 @@ func (d *DefaultClient) Release() {
 	ver.Write(clib, config.Upstream.Package.Version, mappedVersion)
 
 	// we have finished tagging the commit, safe to remove the branch
-	if branchName, isLegacy := isLegacyVersion(); isLegacy {
+	if branchName, isLegacy := d.isLegacyVersion(); isLegacy {
 		d.removeBranch(branchName)
 	}
 	// move to website in Github Action...
@@ -365,6 +389,9 @@ func (d *DefaultClient) CleanResource() {
 	issueNumber := int(issueEvent["number"].(float64))
 	regex := regexp.MustCompile(fmt.Sprintf(`(f|F)ix.*#%d`, issueNumber))
 
+	// 1. check this issue is closed by a PR
+	// In Github, close a issue with a commit whose message follows this format
+	// fix/Fix* #{IssueNumber}
 	found := false
 	for _, commit := range d.allCommits() {
 		message := commit.Commit.GetMessage()
@@ -382,6 +409,7 @@ func (d *DefaultClient) CleanResource() {
 
 	var labelName string
 
+	// 2. find out the branch name from the label
 	for _, labels := range issueEvent["labels"].([]map[string]any) {
 		label := labels["name"].(string)
 

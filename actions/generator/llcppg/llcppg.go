@@ -36,7 +36,7 @@ const (
 // canHash check file is hashable.
 // Hashable file: *.go / llcppg.pub / *.symb.json
 func canHash(fileName string) bool {
-	if strings.Contains(fileName, ".go") || strings.Contains(fileName, ".symb.json") {
+	if strings.Contains(fileName, ".go") {
 		return true
 	}
 	_, ok := canHashFile[fileName]

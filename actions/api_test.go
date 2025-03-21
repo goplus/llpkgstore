@@ -3,6 +3,7 @@ package actions
 import (
 	"os"
 	"os/exec"
+	"strings"
 	"testing"
 
 	"github.com/goplus/llpkgstore/actions/versions"
@@ -25,21 +26,11 @@ func TestHasTag(t *testing.T) {
 	}
 }
 
-func recoverFn(branchName string, fn func()) (ret any) {
+func recoverFn(branchName string, fn func(legacy bool)) (ret any) {
 	defer func() {
 		ret = recover()
 	}()
-	// setup pullrequest
-	GithubEvent = func() map[string]any {
-		return map[string]any{
-			"pull_request": map[string]any{
-				"base": map[string]any{
-					"ref": branchName,
-				},
-			},
-		}
-	}
-	fn()
+	fn(strings.HasPrefix(branchName, BranchPrefix))
 	return
 }
 
@@ -77,8 +68,8 @@ func TestLegacyVersion1(t *testing.T) {
 	cfg, _ := config.ParseLLPkgConfig(".llpkg.cfg")
 	ver := versions.Read(".llpkgstore.json")
 
-	err := recoverFn("main", func() {
-		checkLegacyVersion(ver, cfg, "v0.1.1")
+	err := recoverFn("main", func(legacy bool) {
+		checkLegacyVersion(ver, cfg, "v0.1.1", legacy)
 	})
 	_, ok := err.(string)
 	isValid := ok && err != ""
@@ -124,8 +115,8 @@ func TestLegacyVersion2(t *testing.T) {
 	cfg, _ := config.ParseLLPkgConfig(".llpkg.cfg")
 	ver := versions.Read(".llpkgstore.json")
 
-	err := recoverFn("release-branch.cjson/v0.1.1", func() {
-		checkLegacyVersion(ver, cfg, "v0.1.2")
+	err := recoverFn("release-branch.cjson/v0.1.1", func(legacy bool) {
+		checkLegacyVersion(ver, cfg, "v0.1.2", legacy)
 	})
 	isValid := err == nil
 
@@ -169,8 +160,8 @@ func TestLegacyVersion3(t *testing.T) {
 	cfg, _ := config.ParseLLPkgConfig(".llpkg.cfg")
 	ver := versions.Read(".llpkgstore.json")
 
-	err := recoverFn("main", func() {
-		checkLegacyVersion(ver, cfg, "v0.3.0")
+	err := recoverFn("main", func(legacy bool) {
+		checkLegacyVersion(ver, cfg, "v0.3.0", legacy)
 	})
 	isValid := err == nil
 
@@ -214,8 +205,8 @@ func TestLegacyVersion4(t *testing.T) {
 	cfg, _ := config.ParseLLPkgConfig(".llpkg.cfg")
 	ver := versions.Read(".llpkgstore.json")
 
-	err := recoverFn("main", func() {
-		checkLegacyVersion(ver, cfg, "v0.0.1")
+	err := recoverFn("main", func(legacy bool) {
+		checkLegacyVersion(ver, cfg, "v0.0.1", legacy)
 	})
 	_, ok := err.(string)
 	isValid := ok && err != ""
@@ -260,8 +251,8 @@ func TestLegacyVersion5(t *testing.T) {
 	cfg, _ := config.ParseLLPkgConfig(".llpkg.cfg")
 	ver := versions.Read(".llpkgstore.json")
 
-	err := recoverFn("main", func() {
-		checkLegacyVersion(ver, cfg, "v0.1.1")
+	err := recoverFn("main", func(legacy bool) {
+		checkLegacyVersion(ver, cfg, "v0.1.1", legacy)
 	})
 	_, ok := err.(string)
 	isValid := ok && err != ""
