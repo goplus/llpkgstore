@@ -6,6 +6,7 @@ import (
 	"log"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"slices"
 	"sort"
 	"strings"
@@ -16,7 +17,7 @@ import (
 	"golang.org/x/mod/semver"
 )
 
-// GithubEvent holds parsed GitHub event data from GITHUB_EVENT_PATH
+// GithubEvent caches parsed GitHub event data from GITHUB_EVENT_PATH
 var GithubEvent = sync.OnceValue(parseGithubEvent)
 
 // In our previous design, each platform should generate *_{OS}_{Arch}.go file
@@ -120,11 +121,11 @@ func parseMappedVersion(version string) (clib, mappedVersion string) {
 }
 
 // isValidLlpkg checks if directory contains both llpkg.cfg and llcppg.cfg
-func isValidLlpkg(files []string) bool {
+func isValidLlpkg(files []os.DirEntry) bool {
 	fileMap := make(map[string]struct{}, len(files))
 
 	for _, file := range files {
-		fileMap[file] = struct{}{}
+		fileMap[filepath.Base(file.Name())] = struct{}{}
 	}
 	_, hasLlpkg := fileMap["llpkg.cfg"]
 	_, hasLlcppg := fileMap["llcppg.cfg"]
