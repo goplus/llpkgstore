@@ -1,0 +1,127 @@
+package llcppg
+
+import (
+	"encoding/hex"
+	"log"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"reflect"
+	"testing"
+
+	"github.com/goplus/llpkgstore/actions/hashutils"
+	"github.com/goplus/llpkgstore/config"
+)
+
+const (
+	testLlpkgConfig = `{
+  "upstream": {
+    "package": {
+      "name": "cjson",
+      "version": "1.7.18"
+    }
+  }
+}`
+	testLlcppgConfig = `{
+    "name": "cjson",
+    "cflags": "$(pkg-config --cflags cjson)",
+    "libs": "$(pkg-config --libs cjson)",
+    "include": [
+            "cjson/cJSON.h"
+    ],
+    "deps": null,
+    "trimPrefixes": [],
+    "cplusplus": false
+}`
+)
+
+func TestHash(t *testing.T) {
+	canHashFn := func(fileName string) bool {
+		return fileName == "gg.test" || fileName == "ggg.test"
+	}
+
+	m, err := hashutils.Dir("testfind2", canHashFn)
+	if err != nil {
+		t.Error(err)
+		return
+	}
+	expectedHash1, _ := hex.DecodeString("a665a45920422f9d417e4867efdc4fb8a04a1f3fff1fa07e998e86f7f7a27ae3")
+	if !reflect.DeepEqual(m, map[string][]byte{
+		"ggg.test": expectedHash1,
+	}) {
+		t.Errorf("unexpected hash result: want: %v got: %v", map[string][]byte{
+			"ggg.test": expectedHash1,
+		}, m)
+		return
+	}
+	m2, err := hashutils.Dir("testfind2/testfind", canHashFn)
+	if err != nil {
+		t.Error(err)
+		return
+	}
+	expectedHash2, _ := hex.DecodeString("a665a45920422f9d417e4867efdc4fb8a04a1f3fff1fa07e998e86f7f7a27ae3")
+	expectedHash3, _ := hex.DecodeString("b3a8e0e1f9ab1bfe3a36f231f676f78bb30a519d2b21e6c530c0eee8ebb4a5d0")
+	if !reflect.DeepEqual(m2, map[string][]byte{
+		"ggg.test": expectedHash2,
+		"gg.test":  expectedHash3,
+	}) {
+		t.Errorf("unexpected hash result: want: %v got: %v", map[string][]byte{
+			"ggg.test": expectedHash2,
+			"gg.test":  expectedHash3,
+		}, m2)
+		return
+	}
+}
+
+func TestLlcppg(t *testing.T) {
+	os.Mkdir("testgenerate", 0777)
+	defer os.RemoveAll("testgenerate")
+	path, _ := filepath.Abs("testgenerate")
+	generator := New(path, "cjson")
+
+	os.WriteFile("testgenerate/llcppg.cfg", []byte(testLlcppgConfig), 0755)
+	os.WriteFile("testgenerate/llpkg.cfg", []byte(testLlpkgConfig), 0755)
+
+	cfg, err := config.ParseLLPkgConfig("testgenerate/llpkg.cfg")
+	if err != nil {
+		log.Fatalf("parse config error: %v", err)
+	}
+	uc, err := config.NewUpstreamFromConfig(cfg.Upstream)
+	if err != nil {
+		log.Fatal(err)
+	}
+	err = uc.Installer.Install(uc.Pkg, "testgenerate")
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	// we have to feed the pc to llcppg
+	os.Setenv("PKG_CONFIG_PATH", path)
+
+	ret, _ := exec.Command("pkg-config", "--libs", "cjson").CombinedOutput()
+
+	t.Log(string(ret))
+
+	if err := generator.Generate(path); err != nil {
+		t.Error(err)
+		return
+	}
+
+	os.Mkdir(filepath.Join(path, ".generate"), 0777)
+
+	if err := generator.Generate(filepath.Join(path, ".generate")); err != nil {
+		t.Error(err)
+		return
+	}
+
+	if err := generator.Check(filepath.Join(path, ".generate")); err != nil {
+		t.Error(err)
+		return
+	}
+	os.WriteFile("testgenerate/cJSON.go", []byte("1234"), 0755)
+	if err := generator.Check(filepath.Join(path, ".generate")); err == nil {
+		t.Error("unexpected check")
+		return
+	}
+	//generator.Check()
+}
