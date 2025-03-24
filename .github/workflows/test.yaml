@@ -14,7 +14,6 @@ jobs:
         go:
           - 1.22.x
           - 1.23.x
-          - 1.24.x
     steps:
       - name: Check out code
         uses: actions/checkout@v4
