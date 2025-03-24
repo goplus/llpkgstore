@@ -35,7 +35,7 @@ func recoverFn(branchName string, fn func(legacy bool)) (ret any) {
 }
 
 func TestLegacyVersion1(t *testing.T) {
-	testLlpkgConfig := `{
+	testLLPkgConfig := `{
 		"upstream": {
 		  "package": {
 			"name": "cjson",
@@ -43,7 +43,7 @@ func TestLegacyVersion1(t *testing.T) {
 		  }
 		}
 	  }`
-	os.WriteFile(".llpkg.cfg", []byte(testLlpkgConfig), 0755)
+	os.WriteFile(".llpkg.cfg", []byte(testLLPkgConfig), 0755)
 	defer os.Remove(".llpkg.cfg")
 
 	b := []byte(`{
@@ -82,7 +82,7 @@ func TestLegacyVersion1(t *testing.T) {
 }
 
 func TestLegacyVersion2(t *testing.T) {
-	testLlpkgConfig := `{
+	testLLPkgConfig := `{
 		"upstream": {
 		  "package": {
 			"name": "cjson",
@@ -90,7 +90,7 @@ func TestLegacyVersion2(t *testing.T) {
 		  }
 		}
 	  }`
-	os.WriteFile(".llpkg.cfg", []byte(testLlpkgConfig), 0755)
+	os.WriteFile(".llpkg.cfg", []byte(testLLPkgConfig), 0755)
 	defer os.Remove(".llpkg.cfg")
 
 	b := []byte(`{
@@ -127,7 +127,7 @@ func TestLegacyVersion2(t *testing.T) {
 }
 
 func TestLegacyVersion3(t *testing.T) {
-	testLlpkgConfig := `{
+	testLLPkgConfig := `{
 		"upstream": {
 		  "package": {
 			"name": "cjson",
@@ -135,7 +135,7 @@ func TestLegacyVersion3(t *testing.T) {
 		  }
 		}
 	  }`
-	os.WriteFile(".llpkg.cfg", []byte(testLlpkgConfig), 0755)
+	os.WriteFile(".llpkg.cfg", []byte(testLLPkgConfig), 0755)
 	defer os.Remove(".llpkg.cfg")
 
 	b := []byte(`{
@@ -172,7 +172,7 @@ func TestLegacyVersion3(t *testing.T) {
 }
 
 func TestLegacyVersion4(t *testing.T) {
-	testLlpkgConfig := `{
+	testLLPkgConfig := `{
 		"upstream": {
 		  "package": {
 			"name": "cjson",
@@ -180,7 +180,7 @@ func TestLegacyVersion4(t *testing.T) {
 		  }
 		}
 	  }`
-	os.WriteFile(".llpkg.cfg", []byte(testLlpkgConfig), 0755)
+	os.WriteFile(".llpkg.cfg", []byte(testLLPkgConfig), 0755)
 	defer os.Remove(".llpkg.cfg")
 
 	b := []byte(`{
@@ -218,7 +218,7 @@ func TestLegacyVersion4(t *testing.T) {
 }
 
 func TestLegacyVersion5(t *testing.T) {
-	testLlpkgConfig := `{
+	testLLPkgConfig := `{
 		"upstream": {
 		  "package": {
 			"name": "cjson",
@@ -226,7 +226,7 @@ func TestLegacyVersion5(t *testing.T) {
 		  }
 		}
 	  }`
-	os.WriteFile(".llpkg.cfg", []byte(testLlpkgConfig), 0755)
+	os.WriteFile(".llpkg.cfg", []byte(testLLPkgConfig), 0755)
 	defer os.Remove(".llpkg.cfg")
 
 	b := []byte(`{

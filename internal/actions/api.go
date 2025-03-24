@@ -378,7 +378,7 @@ func (d *DefaultClient) CheckPR() []string {
 		// don't retrieve files from pr changes, consider about maintenance case
 		files, _ := os.ReadDir(path)
 
-		if !isValidLlpkg(files) {
+		if !isValidLLPkg(files) {
 			delete(pathMap, path)
 			continue
 		}

@@ -14,7 +14,7 @@ import (
 )
 
 const (
-	testLlpkgConfig = `{
+	testLLPkgConfig = `{
   "upstream": {
     "package": {
       "name": "cjson",
@@ -80,7 +80,7 @@ func TestLlcppg(t *testing.T) {
 	generator := New(path, "cjson")
 
 	os.WriteFile("testgenerate/llcppg.cfg", []byte(testLlcppgConfig), 0755)
-	os.WriteFile("testgenerate/llpkg.cfg", []byte(testLlpkgConfig), 0755)
+	os.WriteFile("testgenerate/llpkg.cfg", []byte(testLLPkgConfig), 0755)
 
 	cfg, err := config.ParseLLPkgConfig("testgenerate/llpkg.cfg")
 	if err != nil {

@@ -120,16 +120,16 @@ func parseMappedVersion(version string) (clib, mappedVersion string) {
 	return
 }
 
-// isValidLlpkg checks if directory contains both llpkg.cfg and llcppg.cfg
-func isValidLlpkg(files []os.DirEntry) bool {
+// isValidLLPkg checks if directory contains both llpkg.cfg and llcppg.cfg
+func isValidLLPkg(files []os.DirEntry) bool {
 	fileMap := make(map[string]struct{}, len(files))
 
 	for _, file := range files {
 		fileMap[filepath.Base(file.Name())] = struct{}{}
 	}
-	_, hasLlpkg := fileMap["llpkg.cfg"]
+	_, hasLLPkg := fileMap["llpkg.cfg"]
 	_, hasLlcppg := fileMap["llcppg.cfg"]
-	return hasLlcppg && hasLlpkg
+	return hasLlcppg && hasLLPkg
 }
 
 // checkLegacyVersion validates versioning strategy for legacy package submissions
