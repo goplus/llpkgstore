@@ -9,9 +9,9 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/goplus/llpkgstore/actions/file"
-	"github.com/goplus/llpkgstore/actions/generator"
-	"github.com/goplus/llpkgstore/actions/hashutils"
+	"github.com/goplus/llpkgstore/internal/actions/file"
+	"github.com/goplus/llpkgstore/internal/actions/generator"
+	"github.com/goplus/llpkgstore/internal/actions/hashutils"
 )
 
 var (

@@ -12,13 +12,13 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/goplus/llpkgstore/actions/versions"
 	"github.com/goplus/llpkgstore/config"
+	"github.com/goplus/llpkgstore/internal/actions/versions"
 	"golang.org/x/mod/semver"
 )
 
-// GithubEvent caches parsed GitHub event data from GITHUB_EVENT_PATH
-var GithubEvent = sync.OnceValue(parseGithubEvent)
+// GitHubEvent caches parsed GitHub event data from GITHUB_EVENT_PATH
+var GitHubEvent = sync.OnceValue(parseGitHubEvent)
 
 // In our previous design, each platform should generate *_{OS}_{Arch}.go file
 // Feb 12th, this design revoked, still keep the code.
@@ -41,8 +41,8 @@ func envToString(envm map[string]string) string {
 	return strings.Join(env, "\n")
 }
 
-// parseGithubEvent parses the GitHub event payload from GITHUB_EVENT_PATH into a map
-func parseGithubEvent() map[string]any {
+// parseGitHubEvent parses the GitHub event payload from GITHUB_EVENT_PATH into a map
+func parseGitHubEvent() map[string]any {
 	eventFileName := os.Getenv("GITHUB_EVENT_PATH")
 	if eventFileName == "" {
 		panic("cannot get GITHUB_EVENT_PATH")
@@ -62,7 +62,7 @@ func parseGithubEvent() map[string]any {
 
 // PullRequestEvent extracts pull request details from the parsed GitHub event data
 func PullRequestEvent() map[string]any {
-	pullRequest, ok := GithubEvent()["pull_request"].(map[string]any)
+	pullRequest, ok := GitHubEvent()["pull_request"].(map[string]any)
 	if !ok {
 		panic("cannot parse GITHUB_EVENT_PATH pull_request")
 	}
@@ -71,7 +71,7 @@ func PullRequestEvent() map[string]any {
 
 // IssueEvent retrieves issue-related information from the GitHub event payload
 func IssueEvent() map[string]any {
-	issue, ok := GithubEvent()["issue"].(map[string]any)
+	issue, ok := GitHubEvent()["issue"].(map[string]any)
 	if !ok {
 		panic("cannot parse GITHUB_EVENT_PATH pull_request")
 	}

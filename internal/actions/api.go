@@ -12,8 +12,8 @@ import (
 	"time"
 
 	"github.com/google/go-github/v69/github"
-	"github.com/goplus/llpkgstore/actions/versions"
 	"github.com/goplus/llpkgstore/config"
+	"github.com/goplus/llpkgstore/internal/actions/versions"
 )
 
 const (
@@ -127,7 +127,7 @@ func (d *DefaultClient) isAssociatedWithPullRequest(sha string) bool {
 //	branchName: Base branch name
 //	legacy: True if branch starts with "release-branch."
 func (d *DefaultClient) isLegacyVersion() (branchName string, legacy bool) {
-	pullRequest, ok := GithubEvent()["pull_request"].(map[string]any)
+	pullRequest, ok := GitHubEvent()["pull_request"].(map[string]any)
 	var refName string
 	if !ok {
 		// if this actions is not triggered by pull request, fallback to call API.

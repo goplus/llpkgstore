@@ -6,8 +6,8 @@ import (
 	"os/exec"
 	"path/filepath"
 
-	"github.com/goplus/llpkgstore/actions/generator/llcppg"
 	"github.com/goplus/llpkgstore/config"
+	"github.com/goplus/llpkgstore/internal/actions/generator/llcppg"
 	"github.com/spf13/cobra"
 )
 
