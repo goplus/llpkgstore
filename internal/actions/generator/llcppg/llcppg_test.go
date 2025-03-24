@@ -90,7 +90,7 @@ func TestLlcppg(t *testing.T) {
 	if err != nil {
 		log.Fatal(err)
 	}
-	err = uc.Installer.Install(uc.Pkg, "testgenerate")
+	_, err = uc.Installer.Install(uc.Pkg, "testgenerate")
 	if err != nil {
 		log.Fatal(err)
 	}

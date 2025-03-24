@@ -43,7 +43,7 @@ func runLLCppgGenerateWithDir(dir string) {
 		log.Fatal(err)
 	}
 	log.Printf("Start to generate %s", uc.Pkg.Name)
-	err = uc.Installer.Install(uc.Pkg, dir)
+	_, err = uc.Installer.Install(uc.Pkg, dir)
 	if err != nil {
 		log.Fatal(err)
 	}

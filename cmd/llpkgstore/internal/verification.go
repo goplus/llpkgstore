@@ -31,7 +31,7 @@ func runLLCppgVerificationWithDir(dir string) {
 	if err != nil {
 		log.Fatal(err)
 	}
-	err = uc.Installer.Install(uc.Pkg, dir)
+	_, err = uc.Installer.Install(uc.Pkg, dir)
 	if err != nil {
 		log.Fatal(err)
 	}
