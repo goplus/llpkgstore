@@ -1,13 +1,11 @@
 module github.com/goplus/llpkgstore
 
-go 1.23.0
-
-toolchain go1.23.7
+go 1.22.0
 
 require (
 	github.com/google/go-github/v69 v69.2.0
 	github.com/spf13/cobra v1.9.1
-	golang.org/x/mod v0.24.0
+	golang.org/x/mod v0.23.0
 )
 
 require (

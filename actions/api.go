@@ -251,7 +251,6 @@ func (d *DefaultClient) commitMessage(sha string) *github.RepositoryCommit {
 	return commit
 }
 
-// mappedVersion extracts the mapped version from the latest commit message's "Release-as" directive.
 // mappedVersion parses the latest commit's mapped version from "Release-as" directive
 // Returns:
 //
