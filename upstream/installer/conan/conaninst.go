@@ -3,7 +3,6 @@ package conan
 import (
 	"errors"
 	"fmt"
-	"log"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -37,7 +36,6 @@ func (c *conanInstaller) findBinaryPathFromPC(pkg upstream.Package, dir string) 
 	if err != nil {
 		return "", err
 	}
-	log.Println(string(pcFile))
 	matches := prefixMatch.FindSubmatch(pcFile)
 	if len(matches) != 2 {
 		return "", ErrPCFileNotFound
