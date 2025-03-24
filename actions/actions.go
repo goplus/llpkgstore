@@ -256,9 +256,9 @@ func Repository() (owner, repo string) {
 
 // Token returns Github Token for current runner
 func Token() string {
-	token := os.Getenv("GH_TOKEN")
+	token := os.Getenv("GITHUB_TOKEN")
 	if token == "" {
-		panic("no GH_TOKEN")
+		panic("no GITHUB_TOKEN")
 	}
 	return token
 }
