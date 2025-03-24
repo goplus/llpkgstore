@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"slices"
 	"testing"
 
@@ -32,11 +33,14 @@ func TestConanInstaller(t *testing.T) {
 		t.Errorf("Unexpected error when creating temp dir: %s", err)
 	}
 
-	if err := c.Install(pkg, tempDir); err != nil {
+	bp, err := c.Install(pkg, tempDir)
+	if err != nil {
 		t.Errorf("Install failed: %s", err)
 	}
 
-	if err := verify(pkg, tempDir); err != nil {
+	t.Log(bp)
+
+	if err := verify(pkg, tempDir, bp); err != nil {
 		t.Errorf("Verify failed: %s", err)
 	}
 }
@@ -71,7 +75,7 @@ func TestConanSearch(t *testing.T) {
 
 }
 
-func verify(pkg upstream.Package, installDir string) error {
+func verify(pkg upstream.Package, installDir, binaryPath string) error {
 	// 1. ensure .pc file exists
 	_, err := os.Stat(filepath.Join(installDir, pkg.Name+".pc"))
 	if err != nil {
@@ -86,6 +90,19 @@ func verify(pkg upstream.Package, installDir string) error {
 	out, err := buildCmd.CombinedOutput()
 	if err != nil {
 		return errors.New("pkg-config failed: " + err.Error() + " with output: " + string(out))
+	}
+
+	switch runtime.GOOS {
+	case "linux":
+		matches, _ := filepath.Glob(filepath.Join(binaryPath, "lib", "*.so"))
+		if len(matches) == 0 {
+			return errors.New("cannot find so file")
+		}
+	case "darwin":
+		matches, _ := filepath.Glob(filepath.Join(binaryPath, "lib", "*.dylib"))
+		if len(matches) == 0 {
+			return errors.New("cannot find dylib file")
+		}
 	}
 
 	return nil

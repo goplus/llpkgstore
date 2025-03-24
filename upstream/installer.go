@@ -8,7 +8,7 @@ type Installer interface {
 	// Install downloads and installs the specified package.
 	// The outputDir is where build artifacts (e.g., .pc files, headers) are stored.
 	// Returns an error if installation fails.
-	Install(pkg Package, outputDir string) error
+	Install(pkg Package, outputDir string) (binaryPath string, err error)
 	// Search checks remote repository for the specified package availability.
 	// Returns the search results text and any encountered errors.
 	Search(pkg Package) ([]string, error)
