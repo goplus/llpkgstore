@@ -11,9 +11,10 @@ import (
 	"strings"
 	"time"
 
+	"github.com/MeteorsLiu/llpkgstore/config"
+	"github.com/MeteorsLiu/llpkgstore/internal/actions/file"
+	"github.com/MeteorsLiu/llpkgstore/internal/actions/versions"
 	"github.com/google/go-github/v69/github"
-	"github.com/goplus/llpkgstore/config"
-	"github.com/goplus/llpkgstore/internal/actions/versions"
 )
 
 const (
@@ -35,6 +36,10 @@ func regex(packageName string) *regexp.Regexp {
 	// format: Release-as: clib/semver(with v prefix)
 	// Must have one space in the end of Release-as:
 	return regexp.MustCompile(fmt.Sprintf(regexString, packageName))
+}
+
+func binaryZip(packageName string) string {
+	return fmt.Sprintf("%s_%s.zip", packageName, currentSuffix)
 }
 
 // DefaultClient provides GitHub API client capabilities with authentication for Actions workflows
@@ -98,9 +103,7 @@ func (d *DefaultClient) associatedWithPullRequest(sha string) []*github.PullRequ
 	pulls, _, err := d.client.PullRequests.ListPullRequestsWithCommit(
 		ctx, d.owner, d.repo, sha, &github.ListOptions{},
 	)
-	if err != nil {
-		panic(err)
-	}
+	must(err)
 	return pulls
 }
 
@@ -162,9 +165,7 @@ func (d *DefaultClient) currentPRCommit() []*github.RepositoryCommit {
 		ctx, d.owner, d.repo, prNumber,
 		&github.ListOptions{},
 	)
-	if err != nil {
-		panic(err)
-	}
+	must(err)
 	return commits
 }
 
@@ -180,9 +181,7 @@ func (d *DefaultClient) allCommits() []*github.RepositoryCommit {
 		ctx, d.owner, d.repo,
 		&github.CommitsListOptions{},
 	)
-	if err != nil {
-		panic(err)
-	}
+	must(err)
 	return commits
 }
 
@@ -197,9 +196,7 @@ func (d *DefaultClient) removeLabel(labelName string) {
 	_, err := d.client.Issues.DeleteLabel(
 		ctx, d.owner, d.repo, labelName,
 	)
-	if err != nil {
-		panic(err)
-	}
+	must(err)
 }
 
 // checkMappedVersion validates PR contains valid "Release-as" version declaration
@@ -245,9 +242,7 @@ func (d *DefaultClient) commitMessage(sha string) *github.RepositoryCommit {
 	defer cancel()
 
 	commit, _, err := d.client.Repositories.GetCommit(ctx, d.owner, d.repo, sha, &github.ListOptions{})
-	if err != nil {
-		panic(err)
-	}
+	must(err)
 	return commit
 }
 
@@ -416,9 +411,9 @@ func (d *DefaultClient) CheckPR() []string {
 	return allPaths
 }
 
-// Release handles version tagging and record updates after PR merge
+// Postprocessing handles version tagging and record updates after PR merge
 // Creates Git tags, updates version records, and cleans up legacy branches
-func (d *DefaultClient) Release() {
+func (d *DefaultClient) Postprocessing() {
 	// https://docs.github.com/en/actions/writing-workflows/choosing-when-your-workflow-runs/events-that-trigger-workflows#push
 	sha := LatestCommitSHA()
 	// check it's associated with a pr
@@ -444,20 +439,48 @@ func (d *DefaultClient) Release() {
 	clib, mappedVersion := parseMappedVersion(version)
 
 	// the pr has merged, so we can read it.
-	config, err := config.ParseLLPkgConfig(filepath.Join(clib, "llpkg.cfg"))
-	if err != nil {
-		panic(err)
-	}
+	cfg, err := config.ParseLLPkgConfig(filepath.Join(clib, "llpkg.cfg"))
+	must(err)
 
 	// write it to llpkgstore.json
 	ver := versions.Read("llpkgstore.json")
-	ver.Write(clib, config.Upstream.Package.Version, mappedVersion)
+	ver.Write(clib, cfg.Upstream.Package.Version, mappedVersion)
 
 	// we have finished tagging the commit, safe to remove the branch
 	if branchName, isLegacy := d.isLegacyVersion(); isLegacy {
 		d.removeBranch(branchName)
 	}
 	// move to website in Github Action...
+}
+
+func (d *DefaultClient) Release() {
+	version := d.mappedVersion()
+	// skip it when no mapped version is found
+	if version == "" {
+		panic("no mapped version found in the commit message")
+	}
+
+	clib, mappedVersion := parseMappedVersion(version)
+
+	// the pr has merged, so we can read it.
+	cfg, err := config.ParseLLPkgConfig(filepath.Join(clib, "llpkg.cfg"))
+	must(err)
+
+	uc, err := config.NewUpstreamFromConfig(cfg.Upstream)
+	must(err)
+
+	tempDir, _ := os.MkdirTemp("", "llpkg-tool")
+	err = uc.Installer.Install(uc.Pkg, tempDir)
+	must(err)
+
+	// find conan binary path from pc files
+
+	file.CopyFilePattern(tempDir)
+
+	zipFilePath, _ := filepath.Abs(binaryZip(uc.Pkg.Name))
+
+	file.Zip()
+
 }
 
 // CreateBranchFromLabel creates release branch based on label format
@@ -495,9 +518,8 @@ func (d *DefaultClient) CreateBranchFromLabel(labelName string) {
 		panic("c version dones't follow semver, skip maintaining.")
 	}
 
-	if err := d.createBranch(branchName, shaFromTag(version)); err != nil {
-		panic(err)
-	}
+	err := d.createBranch(branchName, shaFromTag(version))
+	must(err)
 }
 
 // CleanResource removes labels and resources after issue resolution

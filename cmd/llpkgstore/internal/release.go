@@ -5,17 +5,17 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var postProcessingCmd = &cobra.Command{
-	Use:   "postprocessing",
+var releaseCmd = &cobra.Command{
+	Use:   "release",
 	Short: "Verify a PR",
 	Long:  ``,
-	Run:   runPostProcessingCmd,
+	Run:   runReleaseCmd,
 }
 
-func runPostProcessingCmd(_ *cobra.Command, _ []string) {
+func runReleaseCmd(_ *cobra.Command, _ []string) {
 	actions.NewDefaultClient().Postprocessing()
 }
 
 func init() {
-	rootCmd.AddCommand(postProcessingCmd)
+	rootCmd.AddCommand(releaseCmd)
 }

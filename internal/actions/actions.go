@@ -7,13 +7,14 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"slices"
 	"sort"
 	"strings"
 	"sync"
 
-	"github.com/goplus/llpkgstore/config"
-	"github.com/goplus/llpkgstore/internal/actions/versions"
+	"github.com/MeteorsLiu/llpkgstore/config"
+	"github.com/MeteorsLiu/llpkgstore/internal/actions/versions"
 	"golang.org/x/mod/semver"
 )
 
@@ -22,7 +23,7 @@ var GitHubEvent = sync.OnceValue(parseGitHubEvent)
 
 // In our previous design, each platform should generate *_{OS}_{Arch}.go file
 // Feb 12th, this design revoked, still keep the code.
-// var currentSuffix = runtime.GOOS + "_" + runtime.GOARCH
+var currentSuffix = runtime.GOOS + "_" + runtime.GOARCH
 
 // must panics if the error is non-nil, halting execution
 func must(err error) {
@@ -187,7 +188,7 @@ func checkLegacyVersion(ver *versions.Versions, cfg config.LLPkgConfig, mappedVe
 	if semver.MajorMinor(previousVersion) == semver.MajorMinor(currentVersion) &&
 		semver.Compare(previousVersion, currentVersion) > 0 {
 		panic(`cannot submit a historical legacy version.
-	for more details: https://github.com/goplus/llpkgstore/blob/main/docs/llpkgstore.md#branch-maintenance-strategy`)
+	for more details: https://github.com/MeteorsLiu/llpkgstore/blob/main/docs/llpkgstore.md#branch-maintenance-strategy`)
 	}
 
 	// case5: we're the latest patch version for current major and minor, check the mapped version

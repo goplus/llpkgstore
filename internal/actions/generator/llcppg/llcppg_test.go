@@ -9,8 +9,8 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/goplus/llpkgstore/config"
-	"github.com/goplus/llpkgstore/internal/actions/hashutils"
+	"github.com/MeteorsLiu/llpkgstore/config"
+	"github.com/MeteorsLiu/llpkgstore/internal/actions/hashutils"
 )
 
 const (
@@ -90,7 +90,7 @@ func TestLlcppg(t *testing.T) {
 	if err != nil {
 		log.Fatal(err)
 	}
-	err = uc.Installer.Install(uc.Pkg, "testgenerate")
+	_, err = uc.Installer.Install(uc.Pkg, "testgenerate")
 	if err != nil {
 		log.Fatal(err)
 	}

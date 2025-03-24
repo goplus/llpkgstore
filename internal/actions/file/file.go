@@ -1,6 +1,8 @@
 package file
 
 import (
+	"archive/zip"
+	"fmt"
 	"io"
 	"io/fs"
 	"os"
@@ -85,5 +87,63 @@ func CopyFile(from, to string) (err error) {
 	defer w.Close()
 
 	_, err = io.Copy(w, r)
+	return
+}
+
+// Zip zips a directory.
+func Zip(zipDir, fileName string) error {
+	zipFile, err := os.Create(fileName)
+	if err != nil {
+		return err
+	}
+	defer zipFile.Close()
+
+	w := zip.NewWriter(zipFile)
+	defer w.Close()
+
+	return filepath.WalkDir(zipDir, func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		normalizePath, err := filepath.Rel(zipDir, path)
+		if err != nil {
+			return err
+		}
+		if normalizePath == "." {
+			return nil
+		}
+		if d.IsDir() {
+			normalizePath = fmt.Sprintf("%s%c", normalizePath, os.PathSeparator)
+		}
+		zw, err := w.Create(normalizePath)
+		if err != nil {
+			return err
+		}
+		if d.IsDir() {
+			return nil
+		}
+		fs, err := os.Open(path)
+		if err != nil {
+			return err
+		}
+		_, err = io.Copy(zw, fs)
+		if err != nil {
+			return err
+		}
+		return fs.Close()
+	})
+}
+
+func CopyFilePattern(from, to, pattern string) (err error) {
+	matches, err := filepath.Glob(filepath.Join(from, pattern))
+	if err != nil {
+		return err
+	}
+	for _, match := range matches {
+		err = CopyFile(match, filepath.Join(to, filepath.Base(match)))
+		if err != nil {
+			break
+		}
+	}
 	return
 }
