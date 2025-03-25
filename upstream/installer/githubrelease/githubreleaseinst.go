@@ -2,6 +2,7 @@ package githubrelease
 
 import (
 	"archive/tar"
+	"archive/zip"
 	"compress/gzip"
 	"errors"
 	"fmt"
@@ -40,18 +41,29 @@ func (c *ghReleaseInstaller) Config() map[string]string {
 
 // Install downloads the package from the GitHub release and extracts it to the output directory.
 func (c *ghReleaseInstaller) Install(pkg upstream.Package, outputDir string) error {
-	zipPath, err := c.download(c.assertUrl(pkg), outputDir)
+	compressPath, err := c.download(c.assertUrl(pkg), outputDir)
 	if err != nil {
 		return err
 	}
-	err = c.unzip(outputDir, zipPath)
-	if err != nil {
-		return err
+	if strings.HasSuffix(compressPath, ".tar.gz") {
+		err = c.untargz(outputDir, compressPath)
+		if err != nil {
+			return err
+		}
+	} else if strings.HasSuffix(compressPath, ".zip") {
+		err = c.unzip(outputDir, compressPath)
+		if err != nil {
+			return err
+		}
 	}
-	err = os.Remove(zipPath)
+	err = os.Remove(compressPath)
 	if err != nil {
-		return err
+		return fmt.Errorf("cannot delete compressed file: %d", err)
 	}
+	// err = c.setPrefix(outputDir)
+	// if err != nil {
+	// 	return fmt.Errorf("fail to reset .pc prefix: %d", err)
+	// }
 	return nil
 }
 
@@ -62,7 +74,9 @@ func (c *ghReleaseInstaller) Search(pkg upstream.Package) (string, error) {
 }
 
 func (c *ghReleaseInstaller) assertUrl(pkg upstream.Package) string {
-	return fmt.Sprintf("https://github.com/%s/%s/releases/download/%s/%s", c.config["owner"], c.config["repo"], pkg.Version, pkg.Name)
+	releaseName := fmt.Sprintf("%s/%s", pkg.Name, pkg.Version)
+	fileName := fmt.Sprintf("%s_%s.zip", pkg.Name, c.config["platform"]+"_"+c.config["arch"])
+	return fmt.Sprintf("https://github.com/%s/%s/releases/download/%s/%s", c.config["owner"], c.config["repo"], releaseName, fileName)
 }
 
 // Download fetches the package from the specified URL and saves it to the output directory.
@@ -105,7 +119,7 @@ func (c *ghReleaseInstaller) download(url string, outputDir string) (string, err
 
 // Unzip extracts the gzip-compressed tarball to the output directory.
 // The gzipPath must be a .tar.gz file.
-func (c *ghReleaseInstaller) unzip(outputDir string, gzipPath string) error {
+func (c *ghReleaseInstaller) untargz(outputDir string, gzipPath string) error {
 	fr, err := os.Open(gzipPath)
 	if err != nil {
 		return err
@@ -151,4 +165,41 @@ func (c *ghReleaseInstaller) unzip(outputDir string, gzipPath string) error {
 		file.Close()
 	}
 	return nil
+}
+
+// Unzip extracts the gzip-compressed tarball to the output directory.
+// The gzipPath must be a .tar.gz file.
+func (c *ghReleaseInstaller) unzip(outputDir string, zipPath string) error {
+	r, err := zip.OpenReader(zipPath)
+	if err != nil {
+		return err
+	}
+
+	decompress := func(file *zip.File) error {
+		path := filepath.Join(outputDir, file.Name)
+
+		if file.FileInfo().IsDir() {
+			os.MkdirAll(path, 0755)
+			return nil
+		}
+
+		w, err := os.Create(path)
+		if err != nil {
+			return err
+		}
+		fs, err := file.Open()
+		if err != nil {
+			return err
+		}
+		defer fs.Close()
+		io.Copy(w, fs)
+		return w.Close()
+	}
+
+	for _, file := range r.File {
+		if err = decompress(file); err != nil {
+			break
+		}
+	}
+	return err
 }
