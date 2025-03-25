@@ -60,10 +60,10 @@ func (c *ghReleaseInstaller) Install(pkg upstream.Package, outputDir string) err
 	if err != nil {
 		return fmt.Errorf("cannot delete compressed file: %d", err)
 	}
-	// err = c.setPrefix(outputDir)
-	// if err != nil {
-	// 	return fmt.Errorf("fail to reset .pc prefix: %d", err)
-	// }
+	err = c.setPrefix(outputDir)
+	if err != nil {
+		return fmt.Errorf("fail to reset .pc prefix: %d", err)
+	}
 	return nil
 }
 
@@ -202,4 +202,66 @@ func (c *ghReleaseInstaller) unzip(outputDir string, zipPath string) error {
 		}
 	}
 	return err
+}
+
+// reset "prefix" in .PC file, and set prefix to current file
+func (c *ghReleaseInstaller) setPrefix(outputDir string) error {
+	absOutputDir, err := filepath.Abs(outputDir)
+	if err != nil {
+		return err
+	}
+
+	entries, err := os.ReadDir(absOutputDir)
+	if err != nil {
+		return err
+	}
+
+	for _, entry := range entries {
+		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".pc") {
+			continue
+		}
+
+		path := filepath.Join(absOutputDir, entry.Name())
+		info, err := entry.Info()
+		if err != nil {
+			return err
+		}
+
+		content, err := os.ReadFile(path)
+		if err != nil {
+			return err
+		}
+
+		lines := strings.Split(string(content), "\n")
+		modified := false
+		prefixLine := "prefix=" + absOutputDir
+		newLines := make([]string, 0, len(lines)+1)
+		hasPrefixLine := false
+
+		for _, line := range lines {
+			if strings.HasPrefix(line, "prefix=") {
+				newLines = append(newLines, prefixLine)
+				hasPrefixLine = true
+				if line != prefixLine {
+					modified = true
+				}
+			} else {
+				newLines = append(newLines, line)
+			}
+		}
+
+		if !hasPrefixLine {
+			newLines = append([]string{prefixLine}, newLines...)
+			modified = true
+		}
+
+		if modified {
+			err = os.WriteFile(path, []byte(strings.Join(newLines, "\n")), info.Mode())
+			if err != nil {
+				return err
+			}
+		}
+	}
+
+	return nil
 }

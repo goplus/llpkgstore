@@ -2,7 +2,6 @@ package githubrelease
 
 import (
 	"errors"
-	"log"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -14,10 +13,10 @@ import (
 func TestGHInstaller(t *testing.T) {
 	ghr := &ghReleaseInstaller{
 		config: map[string]string{
-			"owner": `MeteorsLiu`,
-			"repo":  `llpkg`,
+			"owner":    `MeteorsLiu`,
+			"repo":     `llpkg`,
 			"platform": `darwin`,
-			"arch": `amd64`,
+			"arch":     `amd64`,
 		},
 	}
 
@@ -31,14 +30,13 @@ func TestGHInstaller(t *testing.T) {
 		t.Errorf("Unexpected error when creating temp dir: %s", err)
 		return
 	}
-	log.Default().Println("tempDir:", tempDir)
-	// defer os.RemoveAll(tempDir)
+	defer os.RemoveAll(tempDir)
 
-	if err = ghr.Install(pkg, "./f"); err != nil {
+	if err = ghr.Install(pkg, tempDir); err != nil {
 		t.Errorf("Install failed: %s", err)
 	}
 
-	if err := verify(pkg, "./f"); err != nil {
+	if err := verify(pkg, tempDir); err != nil {
 		t.Errorf("Verify failed: %s", err)
 	}
 }
