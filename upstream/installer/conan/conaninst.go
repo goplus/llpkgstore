@@ -10,6 +10,8 @@ import (
 
 	"github.com/goplus/llpkgstore/internal/cmdbuilder"
 	"github.com/goplus/llpkgstore/upstream"
+
+	"github.com/goplus/llpkgstore/internal/actions/utils"
 )
 
 var (
@@ -99,9 +101,8 @@ func (c *conanInstaller) Install(pkg upstream.Package, outputDir string) (string
 
 	buildCmd := builder.Cmd()
 
-	out, err := buildCmd.CombinedOutput()
+	err := utils.OutputToStdout(buildCmd)
 	if err != nil {
-		fmt.Println(string(out))
 		return "", err
 	}
 

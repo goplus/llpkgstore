@@ -12,6 +12,7 @@ import (
 	"github.com/goplus/llpkgstore/internal/actions/file"
 	"github.com/goplus/llpkgstore/internal/actions/generator"
 	"github.com/goplus/llpkgstore/internal/actions/hashutils"
+	"github.com/goplus/llpkgstore/internal/actions/utils"
 )
 
 var (
@@ -129,8 +130,8 @@ func (l *llcppgGenerator) Generate(toDir string) error {
 	cmd.Dir = path
 	// llcppg may exit with an error, which may be caused by Stderr.
 	// To avoid that case, we have to check its exit code.
-	if output, err := cmd.CombinedOutput(); isExitedUnexpectedly(err) {
-		return errors.Join(ErrLlcppgGenerate, errors.New(string(output)))
+	if err := utils.OutputToStdout(cmd); isExitedUnexpectedly(err) {
+		return ErrLlcppgGenerate
 	}
 	// check output again
 	generatedPath := filepath.Join(path, l.packageName)
