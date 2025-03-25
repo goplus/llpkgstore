@@ -61,3 +61,40 @@ func TestZip(t *testing.T) {
 	}
 
 }
+
+func TestCopyPattern(t *testing.T) {
+	os.WriteFile("111.test", []byte("0"), 0644)
+	os.WriteFile("222.test", []byte("0"), 0644)
+
+	os.WriteFile("333.test1", []byte("0"), 0644)
+
+	os.Mkdir("aaa", 0777)
+	defer os.Remove("111.test")
+	defer os.Remove("222.test")
+	defer os.Remove("333.test1")
+	defer os.RemoveAll("aaa")
+
+	CopyFilePattern(".", "aaa", "*.test")
+
+	fs, _ := os.ReadDir("./aaa")
+
+	expect := map[string]struct{}{
+		"111.test": {},
+		"222.test": {},
+	}
+
+	fileMap := map[string]struct{}{}
+
+	for _, f := range fs {
+		if _, ok := expect[f.Name()]; !ok {
+			t.Errorf("unexpected file: %s", f.Name())
+		}
+		fileMap[f.Name()] = struct{}{}
+	}
+
+	for fileName := range expect {
+		if _, ok := fileMap[fileName]; !ok {
+			t.Errorf("missing file: %s", fileName)
+		}
+	}
+}
