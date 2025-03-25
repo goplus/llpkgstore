@@ -6,13 +6,8 @@ import (
 	"os/exec"
 	"path/filepath"
 
-<<<<<<< HEAD
 	"github.com/MeteorsLiu/llpkgstore/config"
 	"github.com/MeteorsLiu/llpkgstore/internal/actions/generator/llcppg"
-=======
-	"github.com/goplus/llpkgstore/config"
-	"github.com/goplus/llpkgstore/internal/actions/generator/llcppg"
->>>>>>> 6ac1bf45c9b40c79c28d41e005b9bbd7259b7688
 	"github.com/spf13/cobra"
 )
 
