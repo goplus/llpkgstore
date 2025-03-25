@@ -3,13 +3,20 @@ package conan
 import (
 	"errors"
 	"fmt"
+	"os"
+	"path/filepath"
+	"regexp"
 	"strings"
 
 	"github.com/goplus/llpkgstore/internal/cmdbuilder"
 	"github.com/goplus/llpkgstore/upstream"
 )
 
-var ErrPackageNotFound = errors.New("package not found")
+var (
+	prefixMatch        = regexp.MustCompile(`^prefix=(.*)`)
+	ErrPackageNotFound = errors.New("package not found")
+	ErrPCFileNotFound  = errors.New("pc file not found")
+)
 
 const (
 	ConanfileTemplate = `[requires]
@@ -22,6 +29,25 @@ const (
 	*:shared=True
 	%s`
 )
+
+// in Conan, actual binary path is in the prefix field of *.pc file
+func (c *conanInstaller) findBinaryPathFromPC(pkg upstream.Package, dir string) (string, error) {
+	pcFile, err := os.ReadFile(filepath.Join(dir, pkg.Name+".pc"))
+	if err != nil {
+		return "", err
+	}
+	matches := prefixMatch.FindSubmatch(pcFile)
+	if len(matches) != 2 {
+		return "", ErrPCFileNotFound
+	}
+	binaryDir := string(matches[1])
+	// check dir
+	fs, err := os.Stat(binaryDir)
+	if err != nil || !fs.IsDir() {
+		return "", ErrPCFileNotFound
+	}
+	return binaryDir, nil
+}
 
 // conanInstaller implements the upstream.Installer interface using the Conan package manager.
 // It handles installation of C/C++ libraries by executing installation commands,
@@ -55,7 +81,7 @@ func (c *conanInstaller) options() []string {
 // Install executes Conan installation for the specified package into the output directory.
 // It generates a conan install command with required options,
 // and handles installation artifacts generation (e.g., .pc files).
-func (c *conanInstaller) Install(pkg upstream.Package, outputDir string) error {
+func (c *conanInstaller) Install(pkg upstream.Package, outputDir string) (string, error) {
 	// Build the following command
 	// conan install --requires %s -g PkgConfigDeps --options \\*:shared=True --build=missing --output-folder=%s\
 	builder := cmdbuilder.NewCmdBuilder(cmdbuilder.WithConanSerializer())
@@ -76,10 +102,14 @@ func (c *conanInstaller) Install(pkg upstream.Package, outputDir string) error {
 	out, err := buildCmd.CombinedOutput()
 	if err != nil {
 		fmt.Println(string(out))
-		return err
+		return "", err
 	}
 
-	return nil
+	binaryDir, err := c.findBinaryPathFromPC(pkg, outputDir)
+	if err != nil {
+		return "", err
+	}
+	return binaryDir, nil
 }
 
 // Search checks Conan remote repository for the specified package availability.

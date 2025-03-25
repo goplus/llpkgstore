@@ -6,8 +6,13 @@ import (
 	"os/exec"
 	"path/filepath"
 
+<<<<<<< HEAD
 	"github.com/MeteorsLiu/llpkgstore/config"
 	"github.com/MeteorsLiu/llpkgstore/internal/actions/generator/llcppg"
+=======
+	"github.com/goplus/llpkgstore/config"
+	"github.com/goplus/llpkgstore/internal/actions/generator/llcppg"
+>>>>>>> 6ac1bf45c9b40c79c28d41e005b9bbd7259b7688
 	"github.com/spf13/cobra"
 )
 
@@ -43,7 +48,7 @@ func runLLCppgGenerateWithDir(dir string) {
 		log.Fatal(err)
 	}
 	log.Printf("Start to generate %s", uc.Pkg.Name)
-	err = uc.Installer.Install(uc.Pkg, dir)
+	_, err = uc.Installer.Install(uc.Pkg, dir)
 	if err != nil {
 		log.Fatal(err)
 	}
