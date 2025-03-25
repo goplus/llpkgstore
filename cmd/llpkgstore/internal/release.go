@@ -13,7 +13,7 @@ var releaseCmd = &cobra.Command{
 }
 
 func runReleaseCmd(_ *cobra.Command, _ []string) {
-	actions.NewDefaultClient().Postprocessing()
+	actions.NewDefaultClient().Release()
 }
 
 func init() {
