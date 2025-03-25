@@ -1,6 +1,8 @@
-package ghrelease
+package githubrelease
 
 import (
+	"archive/tar"
+	"compress/gzip"
 	"errors"
 	"fmt"
 	"io"
@@ -38,7 +40,15 @@ func (c *ghReleaseInstaller) Config() map[string]string {
 
 // Install downloads the package from the GitHub release and extracts it to the output directory.
 func (c *ghReleaseInstaller) Install(pkg upstream.Package, outputDir string) error {
-	err := c.download(c.assertUrl(pkg), outputDir)
+	zipPath, err := c.download(c.assertUrl(pkg), outputDir)
+	if err != nil {
+		return err
+	}
+	err = c.unzip(outputDir, zipPath)
+	if err != nil {
+		return err
+	}
+	err = os.Remove(zipPath)
 	if err != nil {
 		return err
 	}
@@ -55,20 +65,19 @@ func (c *ghReleaseInstaller) assertUrl(pkg upstream.Package) string {
 	return fmt.Sprintf("https://github.com/%s/%s/releases/download/%s/%s", c.config["owner"], c.config["repo"], pkg.Version, pkg.Name)
 }
 
-func (c *ghReleaseInstaller) download(url string, outputDir string) error {
+// Download fetches the package from the specified URL and saves it to the output directory.
+func (c *ghReleaseInstaller) download(url string, outputDir string) (string, error) {
 	client := &http.Client{}
 	resp, err := client.Get(url)
-
 	if err != nil {
-		return err
+		return "", err
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode == http.StatusNotFound {
-		return ErrPackageNotFound
+		return "", ErrPackageNotFound
 	}
-
 	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("unexpected status code: %d", resp.StatusCode)
+		return "", fmt.Errorf("unexpected status code: %d", resp.StatusCode)
 	}
 
 	parts := strings.Split(url, "/")
@@ -76,20 +85,70 @@ func (c *ghReleaseInstaller) download(url string, outputDir string) error {
 
 	err = os.MkdirAll(outputDir, 0755)
 	if err != nil {
-		return err
+		return "", err
 	}
 
 	outputPath := filepath.Join(outputDir, filename)
 	outFile, err := os.Create(outputPath)
 	if err != nil {
-		return err
+		return "", err
 	}
 	defer outFile.Close()
 
 	_, err = io.Copy(outFile, resp.Body)
 	if err != nil {
-		return err
+		return "", err
 	}
 
+	return outputPath, nil
+}
+
+// Unzip extracts the gzip-compressed tarball to the output directory.
+// The gzipPath must be a .tar.gz file.
+func (c *ghReleaseInstaller) unzip(outputDir string, gzipPath string) error {
+	fr, err := os.Open(gzipPath)
+	if err != nil {
+		return err
+	}
+	defer fr.Close()
+
+	gr, err := gzip.NewReader(fr)
+	if err != nil {
+		return err
+	}
+	defer gr.Close()
+
+	tr := tar.NewReader(gr)
+	for {
+		header, err := tr.Next()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			return err
+		}
+
+		path := filepath.Join(outputDir, header.Name)
+		info := header.FileInfo()
+
+		if info.IsDir() {
+			if err = os.MkdirAll(path, info.Mode()); err != nil {
+				return err
+			}
+			continue
+		}
+		dir := filepath.Dir(path)
+		if err = os.MkdirAll(dir, 0755); err != nil {
+			return err
+		}
+		file, err := os.OpenFile(path, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, info.Mode())
+		if err != nil {
+			return err
+		}
+		if _, err = io.Copy(file, tr); err != nil {
+			return err
+		}
+		file.Close()
+	}
 	return nil
 }

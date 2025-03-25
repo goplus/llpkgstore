@@ -1,4 +1,4 @@
-package ghrelease
+package githubrelease
 
 import (
 	"testing"
@@ -19,7 +19,7 @@ func TestGHInstaller(t *testing.T) {
 		Name:    `llgo0.10.1.darwin-amd64.tar.gz`,
 	}
 
-	err := ghr.Install(pkg, `./f`)
+	err := ghr.Install(pkg, `./install`)
 	if err != nil {
 		t.Errorf("Install failed: %s", err)
 	}
