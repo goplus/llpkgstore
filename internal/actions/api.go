@@ -346,17 +346,12 @@ func (d *DefaultClient) createReleaseByTag(tag string) *github.RepositoryRelease
 	return release
 }
 
-func (d *DefaultClient) getOrSetReleaseByTag(tag string) *github.RepositoryRelease {
+func (d *DefaultClient) getReleaseByTag(tag string) *github.RepositoryRelease {
 	ctx, cancel := context.WithTimeout(context.TODO(), 30*time.Second)
 	defer cancel()
 
 	release, _, err := d.client.Repositories.GetReleaseByTag(ctx, d.owner, d.repo, tag)
-
-	// try to create release.
-	if err != nil {
-		release = d.createReleaseByTag(tag)
-	}
-
+	must(err)
 	// ok we get the relase entry
 	return release
 }
@@ -494,6 +489,9 @@ func (d *DefaultClient) Postprocessing() {
 		panic(err)
 	}
 
+	// create a release
+	d.createReleaseByTag(version)
+
 	clib, mappedVersion := parseMappedVersion(version)
 
 	// the pr has merged, so we can read it.
@@ -537,7 +535,7 @@ func (d *DefaultClient) Release() {
 	err = file.Zip(path, zipFilePath)
 	must(err)
 
-	release := d.getOrSetReleaseByTag(version)
+	release := d.getReleaseByTag(version)
 
 	// upload file to release
 	err = d.uploadFileToRelease(zipFilePath, release)
