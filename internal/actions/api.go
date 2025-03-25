@@ -21,7 +21,9 @@ const (
 	LabelPrefix         = "branch:"
 	BranchPrefix        = "release-branch."
 	MappedVersionPrefix = "Release-as: "
-	regexString         = `Release-as:\s%s/v(?P<major>0|[1-9]\d*)\.(?P<minor>0|[1-9]\d*)\.(?P<patch>0|[1-9]\d*)(?:-(?P<prerelease>(?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*)(?:\.(?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*))*))?(?:\+(?P<buildmetadata>[0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?`
+
+	defaultReleaseBranch = "main"
+	regexString          = `Release-as:\s%s/v(?P<major>0|[1-9]\d*)\.(?P<minor>0|[1-9]\d*)\.(?P<patch>0|[1-9]\d*)(?:-(?P<prerelease>(?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*)(?:\.(?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*))*))?(?:\+(?P<buildmetadata>[0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?`
 )
 
 // regex compiles a regular expression pattern to detect "Release-as" directives in commit messages
@@ -320,6 +322,62 @@ func (d *DefaultClient) createBranch(branchName, sha string) error {
 	return err
 }
 
+func (d *DefaultClient) createReleaseByTag(tag string) *github.RepositoryRelease {
+	ctx, cancel := context.WithTimeout(context.TODO(), 30*time.Second)
+	defer cancel()
+
+	branch := defaultReleaseBranch
+
+	makeLatest := "true"
+	if _, isLegacy := d.isLegacyVersion(); isLegacy {
+		makeLatest = "legacy"
+	}
+	generateRelease := true
+
+	release, _, err := d.client.Repositories.CreateRelease(ctx, d.owner, d.repo, &github.RepositoryRelease{
+		TagName:              &tag,
+		TargetCommitish:      &branch,
+		Name:                 &tag,
+		MakeLatest:           &makeLatest,
+		GenerateReleaseNotes: &generateRelease,
+	})
+	must(err)
+
+	return release
+}
+
+func (d *DefaultClient) getOrSetReleaseByTag(tag string) *github.RepositoryRelease {
+	ctx, cancel := context.WithTimeout(context.TODO(), 30*time.Second)
+	defer cancel()
+
+	release, _, err := d.client.Repositories.GetReleaseByTag(ctx, d.owner, d.repo, tag)
+
+	// try to create release.
+	if err != nil {
+		release = d.createReleaseByTag(tag)
+	}
+
+	// ok we get the relase entry
+	return release
+}
+
+func (d *DefaultClient) uploadFileToRelease(fileName string, release *github.RepositoryRelease) error {
+	ctx, cancel := context.WithTimeout(context.TODO(), 30*time.Second)
+	defer cancel()
+
+	fs, err := os.Open(fileName)
+	must(err)
+	defer fs.Close()
+
+	_, _, err = d.client.Repositories.UploadReleaseAsset(
+		ctx, d.owner, d.repo, release.GetID(),
+		&github.UploadOptions{
+			Name: filepath.Base(fs.Name()),
+		}, fs)
+
+	return err
+}
+
 // removeBranch deletes a branch from the repository
 // Parameters:
 //
@@ -460,8 +518,7 @@ func (d *DefaultClient) Release() {
 		panic("no mapped version found in the commit message")
 	}
 
-	clib, mappedVersion := parseMappedVersion(version)
-
+	clib, _ := parseMappedVersion(version)
 	// the pr has merged, so we can read it.
 	cfg, err := config.ParseLLPkgConfig(filepath.Join(clib, "llpkg.cfg"))
 	must(err)
@@ -470,16 +527,21 @@ func (d *DefaultClient) Release() {
 	must(err)
 
 	tempDir, _ := os.MkdirTemp("", "llpkg-tool")
-	err = uc.Installer.Install(uc.Pkg, tempDir)
+	path, err := uc.Installer.Install(uc.Pkg, tempDir)
 	must(err)
 
-	// find conan binary path from pc files
-
-	file.CopyFilePattern(tempDir)
+	file.CopyFilePattern(tempDir, path, "*.pc")
 
 	zipFilePath, _ := filepath.Abs(binaryZip(uc.Pkg.Name))
 
-	file.Zip()
+	err = file.Zip(path, zipFilePath)
+	must(err)
+
+	release := d.getOrSetReleaseByTag(version)
+
+	// upload file to release
+	err = d.uploadFileToRelease(zipFilePath, release)
+	must(err)
 
 }
 

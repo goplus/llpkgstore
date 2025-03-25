@@ -8,8 +8,8 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/goplus/llpkgstore/internal/cmdbuilder"
-	"github.com/goplus/llpkgstore/upstream"
+	"github.com/MeteorsLiu/llpkgstore/internal/cmdbuilder"
+	"github.com/MeteorsLiu/llpkgstore/upstream"
 )
 
 var (
