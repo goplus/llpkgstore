@@ -40,13 +40,13 @@ func (c *conanInstaller) findBinaryPathFromPC(pkg upstream.Package, dir string) 
 	if len(matches) != 2 {
 		return "", ErrPCFileNotFound
 	}
-	binaryPath := string(matches[1])
+	binaryDir := string(matches[1])
 	// check dir
-	fs, err := os.Stat(binaryPath)
+	fs, err := os.Stat(binaryDir)
 	if err != nil || !fs.IsDir() {
 		return "", ErrPCFileNotFound
 	}
-	return binaryPath, nil
+	return binaryDir, nil
 }
 
 // conanInstaller implements the upstream.Installer interface using the Conan package manager.
@@ -105,11 +105,11 @@ func (c *conanInstaller) Install(pkg upstream.Package, outputDir string) (string
 		return "", err
 	}
 
-	binaryPath, err := c.findBinaryPathFromPC(pkg, outputDir)
+	binaryDir, err := c.findBinaryPathFromPC(pkg, outputDir)
 	if err != nil {
 		return "", err
 	}
-	return binaryPath, nil
+	return binaryDir, nil
 }
 
 // Search checks Conan remote repository for the specified package availability.

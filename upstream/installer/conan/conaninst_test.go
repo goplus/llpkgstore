@@ -75,7 +75,7 @@ func TestConanSearch(t *testing.T) {
 
 }
 
-func verify(pkg upstream.Package, installDir, binaryPath string) error {
+func verify(pkg upstream.Package, installDir, binaryDir string) error {
 	// 1. ensure .pc file exists
 	_, err := os.Stat(filepath.Join(installDir, pkg.Name+".pc"))
 	if err != nil {
@@ -94,12 +94,12 @@ func verify(pkg upstream.Package, installDir, binaryPath string) error {
 
 	switch runtime.GOOS {
 	case "linux":
-		matches, _ := filepath.Glob(filepath.Join(binaryPath, "lib", "*.so"))
+		matches, _ := filepath.Glob(filepath.Join(binaryDir, "lib", "*.so"))
 		if len(matches) == 0 {
 			return errors.New("cannot find so file")
 		}
 	case "darwin":
-		matches, _ := filepath.Glob(filepath.Join(binaryPath, "lib", "*.dylib"))
+		matches, _ := filepath.Glob(filepath.Join(binaryDir, "lib", "*.dylib"))
 		if len(matches) == 0 {
 			return errors.New("cannot find dylib file")
 		}
