@@ -11,10 +11,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/MeteorsLiu/llpkgstore/config"
-	"github.com/MeteorsLiu/llpkgstore/internal/actions/file"
-	"github.com/MeteorsLiu/llpkgstore/internal/actions/versions"
 	"github.com/google/go-github/v69/github"
+	"github.com/goplus/llpkgstore/config"
+	"github.com/goplus/llpkgstore/internal/actions/file"
+	"github.com/goplus/llpkgstore/internal/actions/versions"
 )
 
 const (

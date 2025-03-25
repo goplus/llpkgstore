@@ -1,7 +1,7 @@
 package versions
 
 import (
-	"github.com/MeteorsLiu/llpkgstore/metadata"
+	"github.com/goplus/llpkgstore/metadata"
 	"golang.org/x/mod/semver"
 )
 
@@ -20,7 +20,7 @@ func newCverMap() *cVerMap {
 
 // GoVersions returns all Go versions associated with all C versions
 func (c *cVerMap) GoVersions() (tmp []string) {
-	if len(c.m) == 0 {
+	if c == nil || len(c.m) == 0 {
 		return nil
 	}
 	if c.goVersionsCache != nil {
@@ -36,6 +36,9 @@ func (c *cVerMap) GoVersions() (tmp []string) {
 
 // Versions returns all C versions stored in the map
 func (c *cVerMap) Versions() []string {
+	if c == nil || len(c.m) == 0 {
+		return nil
+	}
 	if c.cVerCache != nil {
 		return c.cVerCache
 	}
@@ -49,7 +52,7 @@ func (c *cVerMap) Versions() []string {
 
 // LatestGoVersion returns the highest semantic version of all Go versions
 func (c *cVerMap) LatestGoVersion() string {
-	if len(c.m) == 0 {
+	if c == nil || len(c.m) == 0 {
 		return ""
 	}
 	goVersions := c.GoVersions()

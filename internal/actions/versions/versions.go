@@ -7,7 +7,7 @@ import (
 	"os"
 	"slices"
 
-	"github.com/MeteorsLiu/llpkgstore/metadata"
+	"github.com/goplus/llpkgstore/metadata"
 	"golang.org/x/mod/semver"
 )
 

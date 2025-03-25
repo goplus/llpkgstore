@@ -9,8 +9,8 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/MeteorsLiu/llpkgstore/config"
-	"github.com/MeteorsLiu/llpkgstore/internal/actions/hashutils"
+	"github.com/goplus/llpkgstore/config"
+	"github.com/goplus/llpkgstore/internal/actions/hashutils"
 )
 
 const (
