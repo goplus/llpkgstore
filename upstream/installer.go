@@ -7,8 +7,8 @@ type Installer interface {
 	Config() map[string]string
 	// Install downloads and installs the specified package.
 	// The outputDir is where build artifacts (e.g., .pc files, headers) are stored.
-	// Returns an error if installation fails, binaryDir if success.
-	Install(pkg Package, outputDir string) (binaryDir string, err error)
+	// Returns an error if installation fails, pkgConfigName if success.
+	Install(pkg Package, outputDir string) (pkgConfigName string, err error)
 	// Search checks remote repository for the specified package availability.
 	// Returns the search results text and any encountered errors.
 	Search(pkg Package) ([]string, error)
