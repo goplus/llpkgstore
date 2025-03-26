@@ -127,12 +127,10 @@ func (l *llcppgGenerator) Generate(toDir string) error {
 	}
 	cmd := exec.Command("llcppg", llcppgConfigFile)
 	cmd.Dir = path
-	cmd.Stderr = os.Stderr
-	cmd.Stdout = os.Stdout
 	// llcppg may exit with an error, which may be caused by Stderr.
 	// To avoid that case, we have to check its exit code.
-	if err := cmd.Run(); isExitedUnexpectedly(err) {
-		return errors.Join(ErrLlcppgGenerate, err)
+	if output, err := cmd.CombinedOutput(); isExitedUnexpectedly(err) {
+		return errors.Join(ErrLlcppgGenerate, errors.New(string(output)))
 	}
 	// check output again
 	generatedPath := filepath.Join(path, l.packageName)
