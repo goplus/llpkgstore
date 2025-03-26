@@ -81,6 +81,7 @@ func (c *conanInstaller) findBinaryPathFromPC(pkg upstream.Package, dir string, 
 		}
 	}
 	if pkgConfigName == "" {
+		// if pkg-config name is not specified, default to package name.
 		pkgConfigName = pkg.Name
 	}
 	pcFile, err := os.ReadFile(filepath.Join(dir, pkgConfigName+".pc"))
