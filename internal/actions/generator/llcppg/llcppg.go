@@ -124,8 +124,6 @@ func (l *llcppgGenerator) Generate(toDir string) error {
 	cmd.Dir = path
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
-	lockGoVersion(cmd)
-
 	// llcppg may exit with an error, which may be caused by Stderr.
 	// To avoid that case, we have to check its exit code.
 	if err := cmd.Run(); isExitedUnexpectedly(err) {
