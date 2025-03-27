@@ -124,7 +124,7 @@ func (l *llcppgGenerator) Generate(toDir string) error {
 	cmd.Dir = path
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
-	lockGoVersion(cmd, path)
+	lockGoVersion(cmd, l.dir)
 
 	// llcppg may exit with an error, which may be caused by Stderr.
 	// To avoid that case, we have to check its exit code.
@@ -139,7 +139,7 @@ func (l *llcppgGenerator) Generate(toDir string) error {
 	// edit go.mod
 	cmd = exec.Command("go", "mod", "edit", "-module", l.normalizeModulePath())
 	cmd.Dir = generatedPath
-	lockGoVersion(cmd, path)
+	lockGoVersion(cmd, l.dir)
 
 	cmd.Run()
 
