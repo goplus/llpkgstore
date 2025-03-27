@@ -533,8 +533,8 @@ func (d *DefaultClient) Release() {
 	// clear exist .pc
 	os.RemoveAll(pkgConfigDir)
 
-	os.Mkdir(pkgConfigDir, 0777)
-
+	err = os.Mkdir(pkgConfigDir, 0777)
+	must(err)
 	pcFiles := filepath.Join(tempDir, "*.pc")
 
 	matches, _ := filepath.Glob(pcFiles)
