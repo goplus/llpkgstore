@@ -52,7 +52,7 @@ func TestABSPathPCTemplate(t *testing.T) {
 	os.WriteFile(pcPath, []byte(testPCFile), 0644)
 	os.Mkdir(".generated", 0777)
 	GenerateTemplateFromPC(pcPath, ".generated")
-	defer os.Remove("test.pc")
+	defer os.Remove(pcPath)
 	defer os.RemoveAll(".generated")
 	b, err := os.ReadFile(filepath.Join(".generated", "test.pc.tmpl"))
 	if err != nil {
