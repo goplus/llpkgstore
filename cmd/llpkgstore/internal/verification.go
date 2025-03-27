@@ -35,9 +35,6 @@ func runLLCppgVerificationWithDir(dir string) {
 	if err != nil {
 		log.Fatal(err)
 	}
-	// we have to feed the pc to llcppg
-	os.Setenv("PKG_CONFIG_PATH", dir)
-
 	generator := llcppg.New(dir, cfg.Upstream.Package.Name)
 
 	generated := filepath.Join(dir, ".generated")

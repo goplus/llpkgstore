@@ -44,10 +44,11 @@ func canHash(fileName string) bool {
 }
 
 // lockGoVersion locks current Go version to `llcppgGoVersion` via GOTOOLCHAIN
-func lockGoVersion(cmd *exec.Cmd) {
+func lockGoVersion(cmd *exec.Cmd, pcPath string) {
 	// don't change global settings, use temporary environment.
 	// see issue: https://github.com/goplus/llpkgstore/issues/18
 	cmd.Env = append(cmd.Environ(), fmt.Sprintf("GOTOOLCHAIN=go%s", llcppgGoVersion))
+	cmd.Env = append(cmd.Env, fmt.Sprintf("PKG_CONFIG_PATH=%s", pcPath))
 }
 
 // diffTwoFiles returns the diff result between a file and b file.
@@ -112,7 +113,6 @@ func (l *llcppgGenerator) copyConfigFileTo(path string) error {
 }
 
 func (l *llcppgGenerator) Generate(toDir string) error {
-
 	path, err := filepath.Abs(toDir)
 	if err != nil {
 		return errors.Join(ErrLlcppgGenerate, err)
@@ -124,7 +124,7 @@ func (l *llcppgGenerator) Generate(toDir string) error {
 	cmd.Dir = path
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
-	lockGoVersion(cmd)
+	lockGoVersion(cmd, l.dir)
 
 	// llcppg may exit with an error, which may be caused by Stderr.
 	// To avoid that case, we have to check its exit code.
@@ -139,7 +139,7 @@ func (l *llcppgGenerator) Generate(toDir string) error {
 	// edit go.mod
 	cmd = exec.Command("go", "mod", "edit", "-module", l.normalizeModulePath())
 	cmd.Dir = generatedPath
-	lockGoVersion(cmd)
+	lockGoVersion(cmd, l.dir)
 
 	cmd.Run()
 

@@ -2,6 +2,7 @@ package conan
 
 import (
 	"errors"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -117,10 +118,9 @@ func verify(installDir, pkgConfigName string) error {
 	}
 
 	// 2. ensure pkg-config can find .pc file
-	os.Setenv("PKG_CONFIG_PATH", installDir)
-	defer os.Unsetenv("PKG_CONFIG_PATH")
-
 	buildCmd := exec.Command("pkg-config", "--cflags", pkgConfigName)
+	absPath, _ := filepath.Abs(installDir)
+	buildCmd.Env = append(buildCmd.Environ(), fmt.Sprintf("PKG_CONFIG_PATH=%s", absPath))
 	out, err := buildCmd.CombinedOutput()
 	if err != nil {
 		return errors.New("pkg-config failed: " + err.Error() + " with output: " + string(out))

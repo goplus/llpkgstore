@@ -41,9 +41,6 @@ func runLLCppgGenerateWithDir(dir string) {
 	if err != nil {
 		log.Fatal(err)
 	}
-	// we have to feed the pc to llcppg
-	os.Setenv("PKG_CONFIG_PATH", dir)
-
 	// try llcppcfg if llcppg.cfg dones't exist
 	if _, err := os.Stat(filepath.Join(dir, "llcppg.cfg")); os.IsNotExist(err) {
 		cmd := exec.Command("llcppcfg", uc.Pkg.Name)

@@ -104,11 +104,10 @@ func TestLlcppg(t *testing.T) {
 		log.Fatal(err)
 	}
 
-	// we have to feed the pc to llcppg
-	os.Setenv("PKG_CONFIG_PATH", path)
+	cmd := exec.Command("pkg-config", "--libs", "cjson")
+	lockGoVersion(cmd, path)
 
-	ret, _ := exec.Command("pkg-config", "--libs", "cjson").CombinedOutput()
-
+	ret, _ := cmd.CombinedOutput()
 	t.Log(string(ret))
 
 	if err := generator.Generate(path); err != nil {
