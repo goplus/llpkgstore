@@ -116,10 +116,13 @@ func verify(installDir, pkgConfigName string) error {
 	if err != nil {
 		return errors.New(".pc file does not exist: " + err.Error())
 	}
-
+	absPath, err := filepath.Abs(installDir)
+	if err != nil {
+		return err
+	}
 	// 2. ensure pkg-config can find .pc file
 	buildCmd := exec.Command("pkg-config", "--cflags", pkgConfigName)
-	absPath, _ := filepath.Abs(installDir)
+
 	pc.SetPath(buildCmd, absPath)
 	out, err := buildCmd.CombinedOutput()
 	if err != nil {
