@@ -11,6 +11,7 @@ import (
 
 	"github.com/goplus/llpkgstore/config"
 	"github.com/goplus/llpkgstore/internal/actions/hashutils"
+	"golang.org/x/mod/modfile"
 )
 
 const (
@@ -34,6 +35,14 @@ const (
     "cplusplus": false
 }`
 )
+
+func checkGoMod(t *testing.T, file string) {
+	b, _ := os.ReadFile(file)
+	f, _ := modfile.Parse(file, b, nil)
+	if f.Go.Version != "1.20" {
+		t.Error("unexpected version")
+	}
+}
 
 func TestHash(t *testing.T) {
 	canHashFn := func(fileName string) bool {
@@ -123,5 +132,9 @@ func TestLlcppg(t *testing.T) {
 		t.Error("unexpected check")
 		return
 	}
+	// check go.mod
+	checkGoMod(t, filepath.Join(path, ".generate", "go.mod"))
+	checkGoMod(t, filepath.Join(path, "go.mod"))
+
 	//generator.Check()
 }
