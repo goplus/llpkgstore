@@ -46,3 +46,21 @@ func TestPCTemplate(t *testing.T) {
 		t.Errorf("unexpected content: got: %s", string(b))
 	}
 }
+
+func TestABSPathPCTemplate(t *testing.T) {
+	pcPath, _ := filepath.Abs("test.pc")
+	os.WriteFile(pcPath, []byte(testPCFile), 0644)
+	os.Mkdir(".generated", 0777)
+	GenerateTemplateFromPC(pcPath, ".generated")
+	defer os.Remove("test.pc")
+	defer os.RemoveAll(".generated")
+	b, err := os.ReadFile(filepath.Join(".generated", "test.pc.tmpl"))
+	if err != nil {
+		t.Error(err)
+		return
+	}
+
+	if string(b) != expectedContent {
+		t.Errorf("unexpected content: got: %s", string(b))
+	}
+}

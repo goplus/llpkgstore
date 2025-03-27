@@ -15,7 +15,7 @@ func GenerateTemplateFromPC(inputName, outputDir string) error {
 	if err != nil {
 		return err
 	}
-	outputName := filepath.Join(outputDir, inputName+PCTemplateSuffix)
+	outputName := filepath.Join(outputDir, filepath.Base(inputName)+PCTemplateSuffix)
 	pcContent = PrefixMatch.ReplaceAll(pcContent, []byte(`prefix={{.Prefix}}`))
 
 	return os.WriteFile(outputName, pcContent, 0644)

@@ -544,10 +544,13 @@ func (d *DefaultClient) Release() {
 	}
 	// generate pc template to lib/pkgconfig
 	for _, matchPC := range matches {
-		pc.GenerateTemplateFromPC(matchPC, pkgConfigDir)
+		err := pc.GenerateTemplateFromPC(matchPC, pkgConfigDir)
+		must(err)
 		// okay, safe to remove old pc
 		os.Remove(matchPC)
 	}
+
+	file.RemovePattern(filepath.Join(tempDir, "*.sh"))
 
 	zipFilePath, _ := filepath.Abs(binaryZip(uc.Pkg.Name))
 
