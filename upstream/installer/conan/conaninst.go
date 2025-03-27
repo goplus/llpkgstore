@@ -6,16 +6,15 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"regexp"
 	"strings"
 
 	"github.com/goplus/llpkgstore/internal/actions/file"
+	"github.com/goplus/llpkgstore/internal/actions/pc"
 	"github.com/goplus/llpkgstore/internal/cmdbuilder"
 	"github.com/goplus/llpkgstore/upstream"
 )
 
 var (
-	prefixMatch        = regexp.MustCompile(`^prefix=(.*)`)
 	ErrPackageNotFound = errors.New("package not found")
 	ErrPCFileNotFound  = errors.New("pc file not found")
 )
@@ -88,7 +87,7 @@ func (c *conanInstaller) findBinaryPathFromPC(pkg upstream.Package, dir string, 
 	if err != nil {
 		return "", "", err
 	}
-	matches := prefixMatch.FindSubmatch(pcFile)
+	matches := pc.PrefixMatch.FindSubmatch(pcFile)
 	if len(matches) != 2 {
 		return "", "", ErrPCFileNotFound
 	}

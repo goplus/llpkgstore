@@ -14,6 +14,7 @@ import (
 	"github.com/google/go-github/v69/github"
 	"github.com/goplus/llpkgstore/config"
 	"github.com/goplus/llpkgstore/internal/actions/file"
+	"github.com/goplus/llpkgstore/internal/actions/pc"
 	"github.com/goplus/llpkgstore/internal/actions/versions"
 )
 
@@ -525,14 +526,28 @@ func (d *DefaultClient) Release() {
 	must(err)
 
 	tempDir, _ := os.MkdirTemp("", "llpkg-tool")
-	path, err := uc.Installer.Install(uc.Pkg, tempDir)
+	_, err = uc.Installer.Install(uc.Pkg, tempDir)
 	must(err)
 
-	file.CopyFilePattern(tempDir, path, "*.pc")
+	pkgConfigDir := filepath.Join(tempDir, "lib", "pkgconfig")
+	// clear exist .pc
+	os.RemoveAll(pkgConfigDir)
+
+	os.Mkdir(pkgConfigDir, 0777)
+
+	matches, _ := filepath.Glob(filepath.Join(tempDir, "*.pc"))
+
+	if len(matches) == 0 {
+		panic("no pc file found, this should not happen")
+	}
+	// generate pc template to lib/pkgconfig
+	for _, matchPC := range matches {
+		pc.GenerateTemplateFromPC(matchPC, pkgConfigDir)
+	}
 
 	zipFilePath, _ := filepath.Abs(binaryZip(uc.Pkg.Name))
 
-	err = file.Zip(path, zipFilePath)
+	err = file.Zip(tempDir, zipFilePath)
 	must(err)
 
 	release := d.getReleaseByTag(version)
