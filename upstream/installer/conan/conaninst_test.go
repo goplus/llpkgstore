@@ -2,7 +2,6 @@ package conan
 
 import (
 	"errors"
-	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -10,6 +9,7 @@ import (
 	"slices"
 	"testing"
 
+	"github.com/goplus/llpkgstore/internal/actions/pc"
 	"github.com/goplus/llpkgstore/upstream"
 )
 
@@ -120,7 +120,7 @@ func verify(installDir, pkgConfigName string) error {
 	// 2. ensure pkg-config can find .pc file
 	buildCmd := exec.Command("pkg-config", "--cflags", pkgConfigName)
 	absPath, _ := filepath.Abs(installDir)
-	buildCmd.Env = append(buildCmd.Environ(), fmt.Sprintf("PKG_CONFIG_PATH=%s", absPath))
+	pc.SetPath(buildCmd, absPath)
 	out, err := buildCmd.CombinedOutput()
 	if err != nil {
 		return errors.New("pkg-config failed: " + err.Error() + " with output: " + string(out))

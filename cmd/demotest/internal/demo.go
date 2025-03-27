@@ -20,6 +20,8 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+
+	"github.com/goplus/llpkgstore/internal/actions/pc"
 )
 
 func RunGenPkgDemo(demoRoot string) {
@@ -53,6 +55,6 @@ func runCommand(pcPath, dir, command string, args ...string) error {
 	cmd.Dir = dir
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
-	cmd.Env = append(cmd.Environ(), fmt.Sprintf("PKG_CONFIG_PATH=%s", pcPath))
+	pc.SetPath(cmd, pcPath)
 	return cmd.Run()
 }
