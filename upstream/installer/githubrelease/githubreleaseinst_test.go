@@ -22,7 +22,7 @@ func TestGHInstaller(t *testing.T) {
 
 	pkg := upstream.Package{
 		Version: `v1.0.0`,
-		Name:    `bzip3`,
+		Name:    `libxml2`,
 	}
 
 	tempDir, err := os.MkdirTemp("", "llpkg-tool")
@@ -32,7 +32,7 @@ func TestGHInstaller(t *testing.T) {
 	}
 	defer os.RemoveAll(tempDir)
 
-	if _, err = ghr.Install(pkg, tempDir); err != nil {
+	if _, err = ghr.Install(pkg, "./f"); err != nil {
 		t.Errorf("Install failed: %s", err)
 	}
 
@@ -43,7 +43,7 @@ func TestGHInstaller(t *testing.T) {
 
 func verify(pkg upstream.Package, installDir string) error {
 	// 1. ensure .pc file exists
-	_, err := os.Stat(filepath.Join(installDir, pkg.Name+".pc"))
+	_, err := os.Stat(filepath.Join(installDir,"lib/pkgconfig", pkg.Name+".pc"))
 	if err != nil {
 		return errors.New(".pc file does not exist: " + err.Error())
 	}

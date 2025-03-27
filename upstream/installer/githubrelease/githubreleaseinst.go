@@ -11,6 +11,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"text/template"
 
 	"github.com/goplus/llpkgstore/upstream"
 )
@@ -211,55 +212,48 @@ func (c *ghReleaseInstaller) setPrefix(outputDir string) error {
 		return err
 	}
 
-	entries, err := os.ReadDir(absOutputDir)
+	// move to path where .pc files are stored
+	pkgConfigPath := filepath.Join(outputDir, "lib/pkgconfig")
+	entries, err := os.ReadDir(pkgConfigPath)
 	if err != nil {
 		return err
 	}
 
 	for _, entry := range entries {
-		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".pc") {
+		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".pc.tmpl") {
 			continue
 		}
-
-		path := filepath.Join(absOutputDir, entry.Name())
 		info, err := entry.Info()
 		if err != nil {
 			return err
 		}
 
-		content, err := os.ReadFile(path)
+		// parse template
+		tmpl, err := template.New(entry.Name()).ParseFiles(filepath.Join(pkgConfigPath, info.Name()))
 		if err != nil {
 			return err
 		}
-
-		lines := strings.Split(string(content), "\n")
-		modified := false
-		prefixLine := "prefix=" + absOutputDir
-		newLines := make([]string, 0, len(lines)+1)
-		hasPrefixLine := false
-
-		for _, line := range lines {
-			if strings.HasPrefix(line, "prefix=") {
-				newLines = append(newLines, prefixLine)
-				hasPrefixLine = true
-				if line != prefixLine {
-					modified = true
-				}
-			} else {
-				newLines = append(newLines, line)
-			}
+		data := struct {
+			Prefix string
+		}{
+			Prefix: absOutputDir,
 		}
+		pcFilePath := filepath.Join(pkgConfigPath, strings.TrimSuffix(info.Name(), ".tmpl"))
 
-		if !hasPrefixLine {
-			newLines = append([]string{prefixLine}, newLines...)
-			modified = true
+		// create new .pc file
+		pcFile, err := os.Create(pcFilePath)
+		if err != nil {
+			return err
 		}
-
-		if modified {
-			err = os.WriteFile(path, []byte(strings.Join(newLines, "\n")), info.Mode())
-			if err != nil {
-				return err
-			}
+		defer pcFile.Close()
+		err = tmpl.Execute(pcFile, data)
+		if err != nil {
+			return err
+		}
+		// remove old .pc file
+		err = os.Remove(filepath.Join(pkgConfigPath, info.Name()))
+		if err != nil {
+			return fmt.Errorf("failed to remove template file: %w", err)
 		}
 	}
 
