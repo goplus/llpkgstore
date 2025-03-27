@@ -12,6 +12,7 @@ import (
 	"github.com/goplus/llpkgstore/internal/actions/file"
 	"github.com/goplus/llpkgstore/internal/actions/generator"
 	"github.com/goplus/llpkgstore/internal/actions/hashutils"
+	"github.com/goplus/llpkgstore/internal/actions/pc"
 )
 
 var (
@@ -47,8 +48,8 @@ func canHash(fileName string) bool {
 func lockGoVersion(cmd *exec.Cmd, pcPath string) {
 	// don't change global settings, use temporary environment.
 	// see issue: https://github.com/goplus/llpkgstore/issues/18
-	cmd.Env = append(cmd.Environ(), fmt.Sprintf("GOTOOLCHAIN=go%s", llcppgGoVersion))
-	cmd.Env = append(cmd.Env, fmt.Sprintf("PKG_CONFIG_PATH=%s", pcPath))
+	pc.SetPath(cmd, pcPath)
+	cmd.Env = append(cmd.Env, fmt.Sprintf("GOTOOLCHAIN=go%s", llcppgGoVersion))
 }
 
 // diffTwoFiles returns the diff result between a file and b file.
