@@ -86,7 +86,7 @@ func TestLlcppg(t *testing.T) {
 	os.Mkdir("testgenerate", 0777)
 	defer os.RemoveAll("testgenerate")
 	path, _ := filepath.Abs("testgenerate")
-	generator := New(path, "cjson")
+	generator := New(path, "cjson", path)
 
 	os.WriteFile("testgenerate/llcppg.cfg", []byte(testLlcppgConfig), 0755)
 	os.WriteFile("testgenerate/llpkg.cfg", []byte(testLLPkgConfig), 0755)

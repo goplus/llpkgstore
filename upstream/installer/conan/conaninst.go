@@ -163,7 +163,7 @@ func (c *conanInstaller) Install(pkg upstream.Package, outputDir string) (string
 		return "", err
 	}
 
-	err = file.CopyFS(outputDir, os.DirFS(binaryDir))
+	err = file.CopyFS(outputDir, os.DirFS(binaryDir), false)
 	if err != nil {
 		return "", err
 	}

@@ -26,7 +26,7 @@ import (
 // Symbolic links in dir are followed.
 //
 // Copying stops at and returns the first error encountered.
-func CopyFS(dir string, fsys fs.FS) error {
+func CopyFS(dir string, fsys fs.FS, skipExist bool) error {
 	return fs.WalkDir(fsys, ".", func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return err
@@ -53,8 +53,15 @@ func CopyFS(dir string, fsys fs.FS) error {
 		if err != nil {
 			return err
 		}
-		w, err := os.OpenFile(newPath, os.O_TRUNC|os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0666|info.Mode()&0777)
+		mode := os.O_TRUNC | os.O_CREATE | os.O_WRONLY
+		if skipExist {
+			mode = os.O_CREATE | os.O_EXCL | os.O_WRONLY
+		}
+		w, err := os.OpenFile(newPath, mode, 0666|info.Mode()&0777)
 		if err != nil {
+			if skipExist {
+				return nil
+			}
 			return err
 		}
 

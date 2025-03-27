@@ -9,6 +9,7 @@ import (
 	"github.com/goplus/llpkgstore/config"
 	"github.com/goplus/llpkgstore/internal/actions/file"
 	"github.com/goplus/llpkgstore/internal/actions/generator/llcppg"
+	"github.com/goplus/llpkgstore/internal/actions/pc"
 	"github.com/spf13/cobra"
 )
 
@@ -37,29 +38,34 @@ func runLLCppgGenerateWithDir(dir string) {
 		log.Fatal(err)
 	}
 	log.Printf("Start to generate %s", uc.Pkg.Name)
-	_, err = uc.Installer.Install(uc.Pkg, dir)
+
+	temp, err := os.MkdirTemp("", "llpkg-tool")
 	if err != nil {
 		log.Fatal(err)
 	}
+	defer os.RemoveAll(temp)
+	pcName, err := uc.Installer.Install(uc.Pkg, temp)
+	if err != nil {
+		log.Fatal(err)
+	}
+	// copy file for debugging.
+	file.CopyFilePattern(temp, dir, "*.pc")
 	// try llcppcfg if llcppg.cfg dones't exist
 	if _, err := os.Stat(filepath.Join(dir, "llcppg.cfg")); os.IsNotExist(err) {
-		cmd := exec.Command("llcppcfg", uc.Pkg.Name)
+		cmd := exec.Command("llcppcfg", pcName)
 		cmd.Dir = dir
-
+		pc.SetPath(cmd, temp)
 		ret, err := cmd.CombinedOutput()
 		if err != nil {
 			log.Fatalf("llcppcfg execute fail: %s", string(ret))
 		}
 	}
 
-	generator := llcppg.New(dir, cfg.Upstream.Package.Name)
+	generator := llcppg.New(dir, cfg.Upstream.Package.Name, temp)
 
 	if err := generator.Generate(dir); err != nil {
 		log.Fatal(err)
 	}
-
-	file.RemovePattern("*.sh")
-	file.RemovePattern("*.bat")
 }
 
 func runLLCppgGenerate(_ *cobra.Command, args []string) {
