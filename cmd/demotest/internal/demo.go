@@ -23,9 +23,6 @@ import (
 )
 
 func RunGenPkgDemo(demoRoot string) {
-	// we have to feed the pc to llcppg
-	os.Setenv("PKG_CONFIG_PATH", demoRoot)
-
 	demosPath := filepath.Join(demoRoot, "_demo")
 
 	fmt.Printf("testing demos in %s\n", demosPath)
@@ -38,7 +35,7 @@ func RunGenPkgDemo(demoRoot string) {
 	for _, demo := range demos {
 		if demo.IsDir() {
 			fmt.Printf("Running demo: %s\n", demo.Name())
-			if demoErr := runCommand(filepath.Join(demosPath, demo.Name()), "llgo", "run", "."); demoErr != nil {
+			if demoErr := runCommand(demoRoot, filepath.Join(demosPath, demo.Name()), "llgo", "run", "."); demoErr != nil {
 				panic(fmt.Sprintf("failed to run demo: %s: %v", demo.Name(), demoErr))
 			}
 		}
@@ -51,10 +48,11 @@ func RunAllGenPkgDemos(baseDir string) {
 	RunGenPkgDemo(absDir)
 }
 
-func runCommand(dir, command string, args ...string) error {
+func runCommand(pcPath, dir, command string, args ...string) error {
 	cmd := exec.Command(command, args...)
 	cmd.Dir = dir
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
+	cmd.Env = append(cmd.Environ(), fmt.Sprintf("PKG_CONFIG_PATH=%s", pcPath))
 	return cmd.Run()
 }
