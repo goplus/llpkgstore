@@ -40,7 +40,7 @@ func checkGoMod(t *testing.T, file string) {
 	b, _ := os.ReadFile(file)
 	f, _ := modfile.Parse(file, b, nil)
 	if f.Go.Version != "1.20" {
-		t.Error("unexpected version")
+		t.Errorf("unexpected version: got: %s", f.Go.Version)
 	}
 }
 
