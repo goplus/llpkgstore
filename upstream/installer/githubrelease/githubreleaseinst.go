@@ -40,37 +40,37 @@ func (c *ghReleaseInstaller) Config() map[string]string {
 }
 
 // Install downloads the package from the GitHub release and extracts it to the output directory.
-func (c *ghReleaseInstaller) Install(pkg upstream.Package, outputDir string) error {
+func (c *ghReleaseInstaller) Install(pkg upstream.Package, outputDir string) (string, error) {
 	compressPath, err := c.download(c.assertUrl(pkg), outputDir)
 	if err != nil {
-		return err
+		return "", err
 	}
 	if strings.HasSuffix(compressPath, ".tar.gz") {
 		err = c.untargz(outputDir, compressPath)
 		if err != nil {
-			return err
+			return "", err
 		}
 	} else if strings.HasSuffix(compressPath, ".zip") {
 		err = c.unzip(outputDir, compressPath)
 		if err != nil {
-			return err
+			return "", err
 		}
 	}
 	err = os.Remove(compressPath)
 	if err != nil {
-		return fmt.Errorf("cannot delete compressed file: %d", err)
+		return "", fmt.Errorf("cannot delete compressed file: %d", err)
 	}
 	err = c.setPrefix(outputDir)
 	if err != nil {
-		return fmt.Errorf("fail to reset .pc prefix: %d", err)
+		return "", fmt.Errorf("fail to reset .pc prefix: %d", err)
 	}
-	return nil
+	return "", nil
 }
 
 // Warning: not implemented
-func (c *ghReleaseInstaller) Search(pkg upstream.Package) (string, error) {
-	// TODO: implement search
-	return "", nil
+func (c *ghReleaseInstaller) Search(pkg upstream.Package) ([]string, error) {
+	// unnecessary
+	return nil, nil
 }
 
 func (c *ghReleaseInstaller) assertUrl(pkg upstream.Package) string {

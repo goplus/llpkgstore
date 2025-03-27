@@ -32,7 +32,7 @@ func TestGHInstaller(t *testing.T) {
 	}
 	defer os.RemoveAll(tempDir)
 
-	if err = ghr.Install(pkg, tempDir); err != nil {
+	if _, err = ghr.Install(pkg, tempDir); err != nil {
 		t.Errorf("Install failed: %s", err)
 	}
 
