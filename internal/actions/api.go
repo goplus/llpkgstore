@@ -535,7 +535,9 @@ func (d *DefaultClient) Release() {
 
 	os.Mkdir(pkgConfigDir, 0777)
 
-	matches, _ := filepath.Glob(filepath.Join(tempDir, "*.pc"))
+	pcFiles := filepath.Join(tempDir, "*.pc")
+
+	matches, _ := filepath.Glob(pcFiles)
 
 	if len(matches) == 0 {
 		panic("no pc file found, this should not happen")
@@ -543,6 +545,8 @@ func (d *DefaultClient) Release() {
 	// generate pc template to lib/pkgconfig
 	for _, matchPC := range matches {
 		pc.GenerateTemplateFromPC(matchPC, pkgConfigDir)
+		// okay, safe to remove old pc
+		os.Remove(matchPC)
 	}
 
 	zipFilePath, _ := filepath.Abs(binaryZip(uc.Pkg.Name))

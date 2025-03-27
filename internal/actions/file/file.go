@@ -147,3 +147,10 @@ func CopyFilePattern(from, to, pattern string) (err error) {
 	}
 	return
 }
+
+func RemovePattern(pattern string) {
+	matches, _ := filepath.Glob(pattern)
+	for _, match := range matches {
+		os.Remove(match)
+	}
+}

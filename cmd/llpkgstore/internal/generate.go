@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 
 	"github.com/goplus/llpkgstore/config"
+	"github.com/goplus/llpkgstore/internal/actions/file"
 	"github.com/goplus/llpkgstore/internal/actions/generator/llcppg"
 	"github.com/spf13/cobra"
 )
@@ -24,13 +25,6 @@ func currentDir() string {
 		panic(err)
 	}
 	return dir
-}
-
-func removePattern(pattern string) {
-	matches, _ := filepath.Glob(pattern)
-	for _, match := range matches {
-		os.Remove(match)
-	}
 }
 
 func runLLCppgGenerateWithDir(dir string) {
@@ -67,8 +61,8 @@ func runLLCppgGenerateWithDir(dir string) {
 		log.Fatal(err)
 	}
 
-	removePattern("*.sh")
-	removePattern("*.bat")
+	file.RemovePattern("*.sh")
+	file.RemovePattern("*.bat")
 }
 
 func runLLCppgGenerate(_ *cobra.Command, args []string) {
