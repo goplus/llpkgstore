@@ -2,6 +2,7 @@ package pc
 
 import (
 	"os"
+	"path/filepath"
 	"testing"
 )
 
@@ -31,10 +32,11 @@ Cflags: -I"${includedir}"`
 
 func TestPCTemplate(t *testing.T) {
 	os.WriteFile("test.pc", []byte(testPCFile), 0644)
-	GenerateTemplateFromPC("test.pc", ".")
+	os.Mkdir(".generated", 0777)
+	GenerateTemplateFromPC("test.pc", ".generated")
 	defer os.Remove("test.pc")
-	defer os.Remove("test.pc.tmpl")
-	b, err := os.ReadFile("test.pc.tmpl")
+	defer os.RemoveAll(".generated")
+	b, err := os.ReadFile(filepath.Join(".generated", "test.pc.tmpl"))
 	if err != nil {
 		t.Error(err)
 		return
