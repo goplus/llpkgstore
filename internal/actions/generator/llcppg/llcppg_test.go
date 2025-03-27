@@ -19,7 +19,7 @@ const (
   "upstream": {
     "package": {
       "name": "cjson",
-      "version": "1.7.18"
+      "version": "1.7.17"
     }
   }
 }`
