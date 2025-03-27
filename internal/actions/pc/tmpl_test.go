@@ -1,0 +1,46 @@
+package pc
+
+import (
+	"os"
+	"testing"
+)
+
+const (
+	testPCFile = `prefix=/home/vscode/.conan2/p/b/zlibbe9abfe31bec0/p
+libdir=${prefix}/lib
+includedir=${prefix}/include
+bindir=${prefix}/bin
+
+Name: zlib
+Description: Conan package: zlib
+Version: 1.3.1
+Libs: -L"${libdir}" -lz
+Cflags: -I"${includedir}"`
+
+	expectedContent = `prefix={{.Prefix}}
+libdir=${prefix}/lib
+includedir=${prefix}/include
+bindir=${prefix}/bin
+
+Name: zlib
+Description: Conan package: zlib
+Version: 1.3.1
+Libs: -L"${libdir}" -lz
+Cflags: -I"${includedir}"`
+)
+
+func TestPCTemplate(t *testing.T) {
+	os.WriteFile("test.pc", []byte(testPCFile), 0644)
+	GenerateTemplateFromPC("test.pc", ".")
+	defer os.Remove("test.pc")
+	defer os.Remove("test.pc.tmpl")
+	b, err := os.ReadFile("test.pc.tmpl")
+	if err != nil {
+		t.Error(err)
+		return
+	}
+
+	if string(b) != expectedContent {
+		t.Errorf("unexpected content: got: %s", string(b))
+	}
+}
