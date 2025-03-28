@@ -187,7 +187,7 @@ func (c *ghReleasesInstaller) unzip(outputDir string, zipPath string) error {
 	if err != nil {
 		return err
 	}
-
+	defer r.Close()
 	decompress := func(file *zip.File) error {
 		path := filepath.Join(outputDir, file.Name)
 
