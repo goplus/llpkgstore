@@ -206,6 +206,7 @@ func (c *ghReleasesInstaller) unzip(outputDir string, zipPath string) error {
 		}
 		defer fs.Close()
 		if _, err := io.Copy(w, fs); err != nil {
+			w.Close()
 			return err
 		}
 		return w.Close()
