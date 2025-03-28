@@ -14,7 +14,7 @@ jobs:
         go:
           - 1.22.x
           - 1.23.x
-        llcppg-version: [v0.2.0]
+        llcppg: [v0.2.0]
     steps:
       - name: Check out code
         uses: actions/checkout@v4
@@ -28,7 +28,7 @@ jobs:
         with:
           repository: 'goplus/llcppg'
           path: .llcppg
-          ref: ${{matrix.llcppg-version}}
+          ref: ${{matrix.llcppg}}
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
@@ -55,9 +55,9 @@ jobs:
         run: |
           llgo install ./_xtool/llcppsymg
           llgo install ./_xtool/llcppsigfetch
-          go install github.com/goplus/llcppg/cmd/llcppcfg@${{matrix.llcppg-version}}
-          go install github.com/goplus/llcppg/cmd/gogensig@${{matrix.llcppg-version}}
-          go install github.com/goplus/llcppg@${{matrix.llcppg-version}}
+          go install github.com/goplus/llcppg/cmd/llcppcfg@${{matrix.llcppg}}
+          go install github.com/goplus/llcppg/cmd/gogensig@${{matrix.llcppg}}
+          go install github.com/goplus/llcppg@${{matrix.llcppg}}
       - name: Check Conan environment
         run: conan profile detect
       - name: Download Go modules
