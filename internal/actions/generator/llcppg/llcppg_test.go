@@ -42,7 +42,7 @@ func checkGoMod(t *testing.T, file string) {
 	if f.Go.Version != "1.20" {
 		t.Errorf("unexpected version: got: %s", f.Go.Version)
 	}
-	if f.Module.Mod.Path != goplusRepo+"/cjson" {
+	if f.Module.Mod.Path != goplusRepo+"cjson" {
 		t.Errorf("unexpected module path: got: %s", f.Module.Mod.Path)
 
 	}
