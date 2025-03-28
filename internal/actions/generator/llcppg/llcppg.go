@@ -122,7 +122,7 @@ func (l *llcppgGenerator) Generate(toDir string) error {
 	if err := l.copyConfigFileTo(path); err != nil {
 		return errors.Join(ErrLlcppgGenerate, err)
 	}
-	cmd := exec.Command("llcppg", llcppgConfigFile, "-mod", l.normalizeModulePath())
+	cmd := exec.Command("llcppg", "-mod", l.normalizeModulePath(), llcppgConfigFile)
 	cmd.Dir = path
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
