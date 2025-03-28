@@ -1,4 +1,4 @@
-package githubrelease
+package githubreleases
 
 import (
 	"archive/tar"
@@ -19,29 +19,29 @@ import (
 
 var ErrPackageNotFound = errors.New("package not found")
 
-// ghReleaseInstaller implements the upstream.Installer interface by downloading
+// ghReleasesInstaller implements the upstream.Installer interface by downloading
 // the corresponding package from a GitHub release.
-type ghReleaseInstaller struct {
+type ghReleasesInstaller struct {
 	config map[string]string
 }
 
-// NewGHReleaseInstaller creates a new GitHub Release installer with the specified configuration.
+// NewGHReleasesInstaller creates a new GitHub Release installer with the specified configuration.
 // The config map is the info of release repo, for example:
 // "owner":    `goplus`,
 // "repo":     `llpkg`,
 // "platform": runtime.GOOS,
 // "arch":     runtime.GOARCH,
-func NewGHReleaseInstaller(config map[string]string) upstream.Installer {
-	return &ghReleaseInstaller{
+func NewGHReleasesInstaller(config map[string]string) upstream.Installer {
+	return &ghReleasesInstaller{
 		config: config,
 	}
 }
 
-func (c *ghReleaseInstaller) Name() string {
-	return "ghrelease"
+func (c *ghReleasesInstaller) Name() string {
+	return "ghreleases"
 }
 
-func (c *ghReleaseInstaller) Config() map[string]string {
+func (c *ghReleasesInstaller) Config() map[string]string {
 	return c.config
 }
 
@@ -49,7 +49,7 @@ func (c *ghReleaseInstaller) Config() map[string]string {
 // Unlike conaninstaller which is used for GitHub Action to obtain binary files
 // this installer is used for `llgo get` to install binary files.
 // The first return value is an empty string, as the pkgConfigName is not necessary for this GitHub Release installer.
-func (c *ghReleaseInstaller) Install(pkg upstream.Package, outputDir string) (string, error) {
+func (c *ghReleasesInstaller) Install(pkg upstream.Package, outputDir string) (string, error) {
 	compressPath, err := c.download(c.assertUrl(pkg), outputDir)
 	if err != nil {
 		return "", err
@@ -78,20 +78,20 @@ func (c *ghReleaseInstaller) Install(pkg upstream.Package, outputDir string) (st
 
 // Warning: not implemented
 // Search is unnecessary for this installer
-func (c *ghReleaseInstaller) Search(pkg upstream.Package) ([]string, error) {
+func (c *ghReleasesInstaller) Search(pkg upstream.Package) ([]string, error) {
 	return nil, nil
 }
 
 // assertUrl returns the URL for the specified package.
 // The URL is constructed based on the package name, version, and the installer configuration.
-func (c *ghReleaseInstaller) assertUrl(pkg upstream.Package) string {
+func (c *ghReleasesInstaller) assertUrl(pkg upstream.Package) string {
 	releaseName := fmt.Sprintf("%s/%s", pkg.Name, pkg.Version)
 	fileName := fmt.Sprintf("%s_%s.zip", pkg.Name, c.config["platform"]+"_"+c.config["arch"])
 	return fmt.Sprintf("https://github.com/%s/%s/releases/download/%s/%s", c.config["owner"], c.config["repo"], releaseName, fileName)
 }
 
 // Download fetches the package from the specified URL and saves it to the output directory.
-func (c *ghReleaseInstaller) download(url string, outputDir string) (string, error) {
+func (c *ghReleasesInstaller) download(url string, outputDir string) (string, error) {
 	client := &http.Client{}
 	resp, err := client.Get(url)
 	if err != nil {
@@ -130,7 +130,7 @@ func (c *ghReleaseInstaller) download(url string, outputDir string) (string, err
 
 // Untargz extracts the gzip-compressed tarball to the output directory.
 // The gzipPath must be a .tar.gz file.
-func (c *ghReleaseInstaller) untargz(outputDir string, gzipPath string) error {
+func (c *ghReleasesInstaller) untargz(outputDir string, gzipPath string) error {
 	fr, err := os.Open(gzipPath)
 	if err != nil {
 		return err
@@ -180,7 +180,7 @@ func (c *ghReleaseInstaller) untargz(outputDir string, gzipPath string) error {
 
 // Unzip extracts the zip file to the output directory.
 // The zipPath must be a .zip file.
-func (c *ghReleaseInstaller) unzip(outputDir string, zipPath string) error {
+func (c *ghReleasesInstaller) unzip(outputDir string, zipPath string) error {
 	r, err := zip.OpenReader(zipPath)
 	if err != nil {
 		return err
@@ -220,7 +220,7 @@ func (c *ghReleaseInstaller) unzip(outputDir string, zipPath string) error {
 }
 
 // Generate .pc files from .pc.tmpl files
-func (c *ghReleaseInstaller) setPrefix(outputDir string) error {
+func (c *ghReleasesInstaller) setPrefix(outputDir string) error {
 	absOutputDir, err := filepath.Abs(outputDir)
 	if err != nil {
 		return err

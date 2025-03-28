@@ -1,4 +1,4 @@
-package githubrelease
+package githubreleases
 
 import (
 	"errors"
@@ -16,7 +16,7 @@ import (
 )
 
 func TestGHInstaller(t *testing.T) {
-	ghr := &ghReleaseInstaller{
+	ghr := &ghReleasesInstaller{
 		config: map[string]string{
 			"owner":    `MeteorsLiu`,
 			"repo":     `llpkg`,
