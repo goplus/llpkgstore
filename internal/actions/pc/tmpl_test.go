@@ -10,24 +10,27 @@ const (
 	testPCFile = `prefix=/home/vscode/.conan2/p/b/zlibbe9abfe31bec0/p
 libdir=${prefix}/lib
 includedir=${prefix}/include
+includedir1=${prefix}/include/libxml2
 bindir=${prefix}/bin
 
-Name: zlib
-Description: Conan package: zlib
-Version: 1.3.1
-Libs: -L"${libdir}" -lz
-Cflags: -I"${includedir}"`
+Name: libxml-2.0
+Description: Conan package: libxml-2.0
+Version: 2.11.6
+Libs: -L"${libdir}" -lxml2 -lm -lpthread -ldl
+Cflags: -I"${includedir}" -I"${includedir1}"
+Requires: zlib`
 
 	expectedContent = `prefix={{.Prefix}}
 libdir=${prefix}/lib
 includedir=${prefix}/include
+includedir1=${prefix}/include/libxml2
 bindir=${prefix}/bin
 
-Name: zlib
-Description: Conan package: zlib
-Version: 1.3.1
-Libs: -L"${libdir}" -lz
-Cflags: -I"${includedir}"`
+Name: libxml-2.0
+Description: Conan package: libxml-2.0
+Version: 2.11.6
+Libs: -L"${libdir}" -lxml2 -lm -lpthread -ldl
+Cflags: -I"${includedir}" -I"${includedir1}"`
 )
 
 func TestPCTemplate(t *testing.T) {
