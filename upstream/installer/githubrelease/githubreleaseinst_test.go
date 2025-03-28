@@ -80,6 +80,7 @@ func verify(installDir string) error {
 		}
 	}
 
+	// 4. ensure .so or .dylib file exists
 	switch runtime.GOOS {
 	case "linux":
 		matches, _ := filepath.Glob(filepath.Join(installDir, "lib", "*.so"))

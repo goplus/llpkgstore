@@ -25,8 +25,12 @@ type ghReleaseInstaller struct {
 	config map[string]string
 }
 
-// NewGHReleaseInstaller creates a new Conan-based installer instance with provided configuration options.
-// The config map supports custom Conan options (e.g., "options": "cjson:utils=True").
+// NewGHReleaseInstaller creates a new GitHub Release installer with the specified configuration.
+// The config map is the info of release repo, for example:
+// "owner":    `goplus`,
+// "repo":     `llpkg`,
+// "platform": runtime.GOOS,
+// "arch":     runtime.GOARCH,
 func NewGHReleaseInstaller(config map[string]string) upstream.Installer {
 	return &ghReleaseInstaller{
 		config: config,
@@ -78,6 +82,8 @@ func (c *ghReleaseInstaller) Search(pkg upstream.Package) ([]string, error) {
 	return nil, nil
 }
 
+// assertUrl returns the URL for the specified package.
+// The URL is constructed based on the package name, version, and the installer configuration.
 func (c *ghReleaseInstaller) assertUrl(pkg upstream.Package) string {
 	releaseName := fmt.Sprintf("%s/%s", pkg.Name, pkg.Version)
 	fileName := fmt.Sprintf("%s_%s.zip", pkg.Name, c.config["platform"]+"_"+c.config["arch"])
@@ -173,7 +179,7 @@ func (c *ghReleaseInstaller) untargz(outputDir string, gzipPath string) error {
 }
 
 // Unzip extracts the gzip-compressed tarball to the output directory.
-// The gzipPath must be a .tar.gz file.
+// The gzipPath must be a .zip file.
 func (c *ghReleaseInstaller) unzip(outputDir string, zipPath string) error {
 	r, err := zip.OpenReader(zipPath)
 	if err != nil {
