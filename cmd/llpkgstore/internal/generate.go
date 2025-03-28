@@ -39,29 +39,29 @@ func runLLCppgGenerateWithDir(dir string) {
 	}
 	log.Printf("Start to generate %s", uc.Pkg.Name)
 
-	temp, err := os.MkdirTemp("", "llpkg-tool")
+	tempDir, err := os.MkdirTemp("", "llpkg-tool")
 	if err != nil {
 		log.Fatal(err)
 	}
-	defer os.RemoveAll(temp)
-	pcName, err := uc.Installer.Install(uc.Pkg, temp)
+	defer os.RemoveAll(tempDir)
+	pcName, err := uc.Installer.Install(uc.Pkg, tempDir)
 	if err != nil {
 		log.Fatal(err)
 	}
 	// copy file for debugging.
-	file.CopyFilePattern(temp, dir, "*.pc")
+	file.CopyFilePattern(tempDir, dir, "*.pc")
 	// try llcppcfg if llcppg.cfg dones't exist
 	if _, err := os.Stat(filepath.Join(dir, "llcppg.cfg")); os.IsNotExist(err) {
 		cmd := exec.Command("llcppcfg", pcName)
 		cmd.Dir = dir
-		pc.SetPath(cmd, temp)
+		pc.SetPath(cmd, tempDir)
 		ret, err := cmd.CombinedOutput()
 		if err != nil {
 			log.Fatalf("llcppcfg execute fail: %s", string(ret))
 		}
 	}
 
-	generator := llcppg.New(dir, cfg.Upstream.Package.Name, temp)
+	generator := llcppg.New(dir, cfg.Upstream.Package.Name, tempDir)
 
 	if err := generator.Generate(dir); err != nil {
 		log.Fatal(err)
