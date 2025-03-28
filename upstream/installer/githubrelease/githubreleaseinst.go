@@ -67,11 +67,11 @@ func (c *ghReleaseInstaller) Install(pkg upstream.Package, outputDir string) (st
 	}
 	err = os.Remove(compressPath)
 	if err != nil {
-		return "", fmt.Errorf("cannot delete compressed file: %d", err)
+		return "", errors.Join(errors.New("cannot delete compressed file: "), err)
 	}
 	err = c.setPrefix(outputDir)
 	if err != nil {
-		return "", fmt.Errorf("fail to reset .pc prefix: %d", err)
+		return "", errors.Join(errors.New("fail to reset .pc prefix: "), err)
 	}
 	return "", nil
 }
@@ -190,7 +190,9 @@ func (c *ghReleaseInstaller) unzip(outputDir string, zipPath string) error {
 		path := filepath.Join(outputDir, file.Name)
 
 		if file.FileInfo().IsDir() {
-			os.MkdirAll(path, 0755)
+			if err := os.MkdirAll(path, 0755); err != nil {
+				return err
+			}
 			return nil
 		}
 
@@ -203,7 +205,9 @@ func (c *ghReleaseInstaller) unzip(outputDir string, zipPath string) error {
 			return err
 		}
 		defer fs.Close()
-		io.Copy(w, fs)
+		if _, err := io.Copy(w, fs); err != nil {
+			return err
+		}
 		return w.Close()
 	}
 
@@ -242,6 +246,8 @@ func (c *ghReleaseInstaller) setPrefix(outputDir string) error {
 		if err != nil {
 			return err
 		}
+		// The Prefix field specifies the absolute path to the output directory,
+		// which is used to replace placeholders in the .pc template files.
 		data := struct {
 			Prefix string
 		}{
@@ -259,7 +265,7 @@ func (c *ghReleaseInstaller) setPrefix(outputDir string) error {
 		// remove .pc.tmpl file
 		err = os.Remove(filepath.Join(pkgConfigPath, tmplName))
 		if err != nil {
-			return fmt.Errorf("failed to remove template file: %w", err)
+			return errors.Join(errors.New("failed to remove template file: "), err)
 		}
 	}
 
