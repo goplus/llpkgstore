@@ -4,6 +4,7 @@ import (
 	"archive/zip"
 	"io"
 	"os"
+	"path/filepath"
 	"testing"
 )
 
@@ -96,5 +97,46 @@ func TestCopyPattern(t *testing.T) {
 		if _, ok := fileMap[fileName]; !ok {
 			t.Errorf("missing file: %s", fileName)
 		}
+	}
+}
+
+func TestCopySkip(t *testing.T) {
+	from, _ := os.MkdirTemp("", "testcopy-from")
+	defer os.RemoveAll(from)
+
+	to, _ := os.MkdirTemp("", "testcopy-to")
+	defer os.RemoveAll(to)
+
+	os.WriteFile(filepath.Join(from, "aaa.test"), []byte("123"), 0644)
+	os.WriteFile(filepath.Join(to, "aaa.test"), []byte("456"), 0644)
+
+	err := CopyFS(to, os.DirFS(from), true)
+	if err != nil {
+		t.Error(err)
+		return
+	}
+
+	toContent, err := os.ReadFile(filepath.Join(to, "aaa.test"))
+	if err != nil {
+		t.Error(err)
+		return
+	}
+
+	if string(toContent) != "456" {
+		t.Errorf("unexpected skip file: want: 456 got: %s", string(toContent))
+	}
+
+	err = CopyFS(to, os.DirFS(from), false)
+	if err != nil {
+		t.Error(err)
+		return
+	}
+	toContent, err = os.ReadFile(filepath.Join(to, "aaa.test"))
+	if err != nil {
+		t.Error(err)
+		return
+	}
+	if string(toContent) != "123" {
+		t.Errorf("unexpected skip file: want: 123 got: %s", string(toContent))
 	}
 }
