@@ -98,7 +98,7 @@ func verify(installDir string) error {
 			return errors.New("prefix is not correctly set")
 		}
 		// 3. ensure pkg-config can find .pc file
-		buildCmd := exec.Command("pkg-config", "--libs", strings.TrimRight(filepath.Base(pcFile), ".pc"))
+		buildCmd := exec.Command("pkg-config", "--libs", strings.TrimSuffix(filepath.Base(pcFile), ".pc"))
 		pc.SetPath(buildCmd, absPath)
 		out, err := buildCmd.CombinedOutput()
 		if err != nil {
