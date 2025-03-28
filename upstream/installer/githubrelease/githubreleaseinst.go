@@ -128,7 +128,7 @@ func (c *ghReleaseInstaller) download(url string, outputDir string) (string, err
 	return outputPath, nil
 }
 
-// Unzip extracts the gzip-compressed tarball to the output directory.
+// Untargz extracts the gzip-compressed tarball to the output directory.
 // The gzipPath must be a .tar.gz file.
 func (c *ghReleaseInstaller) untargz(outputDir string, gzipPath string) error {
 	fr, err := os.Open(gzipPath)
@@ -178,8 +178,8 @@ func (c *ghReleaseInstaller) untargz(outputDir string, gzipPath string) error {
 	return nil
 }
 
-// Unzip extracts the gzip-compressed tarball to the output directory.
-// The gzipPath must be a .zip file.
+// Unzip extracts the zip file to the output directory.
+// The zipPath must be a .zip file.
 func (c *ghReleaseInstaller) unzip(outputDir string, zipPath string) error {
 	r, err := zip.OpenReader(zipPath)
 	if err != nil {
