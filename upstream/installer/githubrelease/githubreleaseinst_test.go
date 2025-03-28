@@ -20,7 +20,7 @@ func TestGHInstaller(t *testing.T) {
 		config: map[string]string{
 			"owner":    `MeteorsLiu`,
 			"repo":     `llpkg`,
-			"platform":  runtime.GOOS,
+			"platform": runtime.GOOS,
 			"arch":     runtime.GOARCH,
 		},
 	}
