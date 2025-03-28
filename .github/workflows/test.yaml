@@ -27,7 +27,7 @@ jobs:
         with:
           repository: 'goplus/llcppg'
           path: .llcppg
-          ref: 'v0.1.0'
+          ref: 'v0.2.0'
       - name: Set up Go
         uses: actions/setup-go@v5
         with:

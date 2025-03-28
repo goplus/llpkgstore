@@ -122,7 +122,7 @@ func (l *llcppgGenerator) Generate(toDir string) error {
 	if err := l.copyConfigFileTo(path); err != nil {
 		return errors.Join(ErrLlcppgGenerate, err)
 	}
-	cmd := exec.Command("llcppg", llcppgConfigFile)
+	cmd := exec.Command("llcppg", llcppgConfigFile, "-mod", l.normalizeModulePath())
 	cmd.Dir = path
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
@@ -138,13 +138,6 @@ func (l *llcppgGenerator) Generate(toDir string) error {
 	if _, err := os.Stat(generatedPath); os.IsNotExist(err) {
 		return errors.Join(ErrLlcppgCheck, errors.New("generate fail"))
 	}
-	// edit go.mod
-	cmd = exec.Command("go", "mod", "edit", "-module", l.normalizeModulePath())
-	cmd.Dir = generatedPath
-	lockGoVersion(cmd, l.dir)
-
-	cmd.Run()
-
 	// copy out the generated result
 	// be careful: llcppg result MUST not override existed file,
 	// otherwise, checking is meaningless.
