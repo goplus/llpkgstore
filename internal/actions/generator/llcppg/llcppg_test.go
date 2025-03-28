@@ -123,7 +123,7 @@ func TestLLCppgCanHash(t *testing.T) {
 
 func TestLLCppg(t *testing.T) {
 	os.Mkdir("testgenerate", 0777)
-	//defer os.RemoveAll("testgenerate")
+	defer os.RemoveAll("testgenerate")
 	path, _ := filepath.Abs("testgenerate")
 	generator := New(path, "cjson", path)
 
