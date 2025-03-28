@@ -8,7 +8,11 @@ import (
 
 const PCTemplateSuffix = ".tmpl"
 
-var PrefixMatch = regexp.MustCompile(`^prefix=(.*)`)
+var (
+	// By the way, trim the new line
+	requireMatch = regexp.MustCompile(`\nRequires:\s.*`)
+	PrefixMatch  = regexp.MustCompile(`^prefix=(.*)`)
+)
 
 func GenerateTemplateFromPC(inputName, outputDir string) error {
 	pcContent, err := os.ReadFile(inputName)
@@ -17,6 +21,7 @@ func GenerateTemplateFromPC(inputName, outputDir string) error {
 	}
 	outputName := filepath.Join(outputDir, filepath.Base(inputName)+PCTemplateSuffix)
 	pcContent = PrefixMatch.ReplaceAll(pcContent, []byte(`prefix={{.Prefix}}`))
+	pcContent = requireMatch.ReplaceAll(pcContent, []byte(""))
 
 	return os.WriteFile(outputName, pcContent, 0644)
 }
