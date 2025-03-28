@@ -1,0 +1,11 @@
+prefix=/home/vscode/.conan2/p/b/cjson1de74c707a9de/p
+libdir=${prefix}/lib
+includedir=${prefix}/include
+bindir=${prefix}/bin
+
+Name: cjson
+Description: Conan package: cjson
+Version: 1.7.17
+Libs: -L"${libdir}"
+Cflags: -I"${includedir}"
+Requires: libcjson

@@ -1,0 +1,7 @@
+1743050798
+conaninfo.txt: 07f4698f8bc910eb5520a13a7be40d09
+include/cjson/cJSON.h: 464b193c7f6fcf79d31251b728d33e0d
+lib/libcjson.so: 12cf2e729502d45c2206d153b855762a
+lib/libcjson.so.1: 7c8616b673f46cb3835ed1135e808010
+lib/libcjson.so.1.7.17: cf831d3343d09c96638f4daf783a3cfb
+licenses/LICENSE: 218947f77e8cb8e2fa02918dc41c50d0
