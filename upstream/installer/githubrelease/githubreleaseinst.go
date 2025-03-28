@@ -3,6 +3,7 @@ package githubrelease
 import (
 	"archive/tar"
 	"archive/zip"
+	"bytes"
 	"compress/gzip"
 	"errors"
 	"fmt"
@@ -40,7 +41,10 @@ func (c *ghReleaseInstaller) Config() map[string]string {
 	return c.config
 }
 
-// Install downloads the package from the GitHub release and extracts it to the output directory.
+// Install downloads the package from the GitHub Release and extracts it to the output directory.
+// Unlike conaninstaller which is used for GitHub Action to obtain binary files
+// this installer is used for `llgo get` to install binary files.
+// The first return value is an empty string, as the pkgConfigName is not necessary for this GitHub Release installer.
 func (c *ghReleaseInstaller) Install(pkg upstream.Package, outputDir string) (string, error) {
 	compressPath, err := c.download(c.assertUrl(pkg), outputDir)
 	if err != nil {
@@ -69,8 +73,8 @@ func (c *ghReleaseInstaller) Install(pkg upstream.Package, outputDir string) (st
 }
 
 // Warning: not implemented
+// Search is unnecessary for this installer
 func (c *ghReleaseInstaller) Search(pkg upstream.Package) ([]string, error) {
-	// unnecessary
 	return nil, nil
 }
 
@@ -205,7 +209,7 @@ func (c *ghReleaseInstaller) unzip(outputDir string, zipPath string) error {
 	return err
 }
 
-// reset "prefix" in .PC file, and set prefix to current file
+// Generate .pc files from .pc.tmpl files
 func (c *ghReleaseInstaller) setPrefix(outputDir string) error {
 	absOutputDir, err := filepath.Abs(outputDir)
 	if err != nil {
@@ -214,22 +218,21 @@ func (c *ghReleaseInstaller) setPrefix(outputDir string) error {
 
 	// move to path where .pc files are stored
 	pkgConfigPath := filepath.Join(outputDir, "lib/pkgconfig")
-	entries, err := os.ReadDir(pkgConfigPath)
+
+	pcTmpls, err := filepath.Glob(filepath.Join(pkgConfigPath, "*.pc.tmpl"))
 	if err != nil {
 		return err
 	}
-
-	for _, entry := range entries {
-		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".pc.tmpl") {
-			continue
-		}
-		info, err := entry.Info()
+	if len(pcTmpls) == 0 {
+		return errors.New("no .pc.tmpl files found")
+	}
+	for _, pcTmpl := range pcTmpls {
+		tmplContent, err := os.ReadFile(pcTmpl)
 		if err != nil {
 			return err
 		}
-
-		// parse template
-		tmpl, err := template.New(entry.Name()).ParseFiles(filepath.Join(pkgConfigPath, info.Name()))
+		tmplName := filepath.Base(pcTmpl)
+		tmpl, err := template.New(tmplName).Parse(string(tmplContent))
 		if err != nil {
 			return err
 		}
@@ -238,20 +241,17 @@ func (c *ghReleaseInstaller) setPrefix(outputDir string) error {
 		}{
 			Prefix: absOutputDir,
 		}
-		pcFilePath := filepath.Join(pkgConfigPath, strings.TrimSuffix(info.Name(), ".tmpl"))
+		pcFilePath := filepath.Join(pkgConfigPath, strings.TrimSuffix(tmplName, ".tmpl"))
 
-		// create new .pc file
-		pcFile, err := os.Create(pcFilePath)
-		if err != nil {
+		var buf bytes.Buffer
+		if err := tmpl.Execute(&buf, data); err != nil {
 			return err
 		}
-		defer pcFile.Close()
-		err = tmpl.Execute(pcFile, data)
-		if err != nil {
+		if err := os.WriteFile(pcFilePath, buf.Bytes(), 0644); err != nil {
 			return err
 		}
-		// remove old .pc file
-		err = os.Remove(filepath.Join(pkgConfigPath, info.Name()))
+		// remove .pc.tmpl file
+		err = os.Remove(filepath.Join(pkgConfigPath, tmplName))
 		if err != nil {
 			return fmt.Errorf("failed to remove template file: %w", err)
 		}

@@ -2,11 +2,16 @@ package githubrelease
 
 import (
 	"errors"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
+	"runtime"
+	"strings"
 	"testing"
 
+	"github.com/goplus/llpkgstore/internal/actions/pc"
 	"github.com/goplus/llpkgstore/upstream"
 )
 
@@ -32,30 +37,60 @@ func TestGHInstaller(t *testing.T) {
 	}
 	defer os.RemoveAll(tempDir)
 
-	if _, err = ghr.Install(pkg, "./f"); err != nil {
+	if _, err = ghr.Install(pkg, tempDir); err != nil {
 		t.Errorf("Install failed: %s", err)
 	}
 
-	if err := verify(pkg, tempDir); err != nil {
+	if err := verify(tempDir); err != nil {
 		t.Errorf("Verify failed: %s", err)
 	}
 }
 
-func verify(pkg upstream.Package, installDir string) error {
+func verify(installDir string) error {
 	// 1. ensure .pc file exists
-	_, err := os.Stat(filepath.Join(installDir,"lib/pkgconfig", pkg.Name+".pc"))
+	pcFiles, err := filepath.Glob(filepath.Join(installDir, "lib/pkgconfig/*.pc"))
 	if err != nil {
-		return errors.New(".pc file does not exist: " + err.Error())
+		return err
+	}
+	if len(pcFiles) == 0 {
+		return errors.New("cannot find .pc file")
+	}
+	absPath, err := filepath.Abs(installDir)
+	if err != nil {
+		return err
 	}
 
-	// 2. ensure pkg-config can find .pc file
-	os.Setenv("PKG_CONFIG_PATH", installDir)
-	defer os.Unsetenv("PKG_CONFIG_PATH")
+	for _, pcFile := range pcFiles {
+		// 2. ensure .pc file's prefix is correctly set
+		pcContent, err := os.ReadFile(pcFile)
+		if err != nil {
+			return err
+		}
+		prefixMatch := regexp.MustCompile(`^prefix=(.*)`)
+		if prefixMatch.FindString(string(pcContent)) != fmt.Sprintf("prefix=%s", absPath) {
+			return errors.New("prefix is not correctly set")
+		}
+		// 3. ensure pkg-config can find .pc file
+		buildCmd := exec.Command("pkg-config", "--libs", strings.TrimRight(filepath.Base(pcFile), ".pc"))
+		println(buildCmd.String())
+		pc.SetPath(buildCmd, absPath)
+		out, err := buildCmd.CombinedOutput()
+		if err != nil {
+			return errors.New("pkg-config failed: " + err.Error() + " with output: " + string(out))
+		}
+	}
 
-	buildCmd := exec.Command("pkg-config", "--cflags", pkg.Name)
-	out, err := buildCmd.CombinedOutput()
-	if err != nil {
-		return errors.New("pkg-config failed: " + err.Error() + " with output: " + string(out))
+	switch runtime.GOOS {
+	case "linux":
+		matches, _ := filepath.Glob(filepath.Join(installDir, "lib", "*.so"))
+		if len(matches) == 0 {
+			return errors.New("cannot find so file")
+		}
+	case "darwin":
+		matches, _ := filepath.Glob(filepath.Join(installDir, "lib", "*.dylib"))
+		if len(matches) == 0 {
+			return errors.New("cannot find dylib file")
+		}
 	}
 
 	return nil
