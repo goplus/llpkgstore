@@ -46,6 +46,33 @@ func TestGHInstaller(t *testing.T) {
 	}
 }
 
+func TestNotExistsReleases(t *testing.T) {
+	ghr := &ghReleasesInstaller{
+		config: map[string]string{
+			"owner":    `goplus`,
+			"repo":     `llpkg`,
+			"platform": runtime.GOOS,
+			"arch":     runtime.GOARCH,
+		},
+	}
+
+	pkg := upstream.Package{
+		Version: `v1.0.0`,
+		Name:    `not-exists-pkg`,
+	}
+
+	tempDir, err := os.MkdirTemp("", "llpkg-tool")
+	if err != nil {
+		t.Errorf("Unexpected error when creating temp dir: %s", err)
+		return
+	}
+	defer os.RemoveAll(tempDir)
+
+	if _, err = ghr.Install(pkg, tempDir); err == nil {
+		t.Errorf("Expecting error but got nil")
+	}
+}
+
 func verify(installDir string) error {
 	// 1. ensure .pc file exists
 	pcFiles, err := filepath.Glob(filepath.Join(installDir, "lib", "pkgconfig", "*.pc"))
