@@ -48,7 +48,7 @@ func TestGHInstaller(t *testing.T) {
 
 func verify(installDir string) error {
 	// 1. ensure .pc file exists
-	pcFiles, err := filepath.Glob(filepath.Join(installDir, "lib/pkgconfig/*.pc"))
+	pcFiles, err := filepath.Glob(filepath.Join(installDir, "lib", "pkgconfig", "*.pc"))
 	if err != nil {
 		return err
 	}

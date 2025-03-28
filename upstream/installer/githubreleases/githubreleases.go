@@ -64,14 +64,16 @@ func (c *ghReleasesInstaller) Install(pkg upstream.Package, outputDir string) (s
 		if err != nil {
 			return "", err
 		}
+	} else {
+		return "", errors.New("unsupported compressed file format")
 	}
 	err = os.Remove(compressPath)
 	if err != nil {
-		return "", errors.Join(errors.New("cannot delete compressed file: "), err)
+		return "", fmt.Errorf("cannot delete compressed file: %w", err)
 	}
 	err = c.setPrefix(outputDir)
 	if err != nil {
-		return "", errors.Join(errors.New("fail to reset .pc prefix: "), err)
+		return "", fmt.Errorf("fail to reset .pc prefix: %w", err)
 	}
 	return "", nil
 }
@@ -79,7 +81,7 @@ func (c *ghReleasesInstaller) Install(pkg upstream.Package, outputDir string) (s
 // Warning: not implemented
 // Search is unnecessary for this installer
 func (c *ghReleasesInstaller) Search(pkg upstream.Package) ([]string, error) {
-	return nil, nil
+	return nil, errors.New("unimplemented")
 }
 
 // assertUrl returns the URL for the specified package.
@@ -90,7 +92,7 @@ func (c *ghReleasesInstaller) assertUrl(pkg upstream.Package) string {
 	return fmt.Sprintf("https://github.com/%s/%s/releases/download/%s/%s", c.config["owner"], c.config["repo"], releaseName, fileName)
 }
 
-// Download fetches the package from the specified URL and saves it to the output directory.
+// download fetches the package from the specified URL and saves it to the output directory.
 func (c *ghReleasesInstaller) download(url string, outputDir string) (string, error) {
 	client := &http.Client{}
 	resp, err := client.Get(url)
@@ -128,7 +130,7 @@ func (c *ghReleasesInstaller) download(url string, outputDir string) (string, er
 	return outputPath, nil
 }
 
-// Untargz extracts the gzip-compressed tarball to the output directory.
+// untargz extracts the gzip-compressed tarball to the output directory.
 // The gzipPath must be a .tar.gz file.
 func (c *ghReleasesInstaller) untargz(outputDir string, gzipPath string) error {
 	fr, err := os.Open(gzipPath)
@@ -178,7 +180,7 @@ func (c *ghReleasesInstaller) untargz(outputDir string, gzipPath string) error {
 	return nil
 }
 
-// Unzip extracts the zip file to the output directory.
+// unzip extracts the zip file to the output directory.
 // The zipPath must be a .zip file.
 func (c *ghReleasesInstaller) unzip(outputDir string, zipPath string) error {
 	r, err := zip.OpenReader(zipPath)
@@ -195,12 +197,11 @@ func (c *ghReleasesInstaller) unzip(outputDir string, zipPath string) error {
 			}
 			return nil
 		}
-
-		w, err := os.Create(path)
+		fs, err := file.Open()
 		if err != nil {
 			return err
 		}
-		fs, err := file.Open()
+		w, err := os.Create(path)
 		if err != nil {
 			return err
 		}
@@ -220,7 +221,7 @@ func (c *ghReleasesInstaller) unzip(outputDir string, zipPath string) error {
 	return err
 }
 
-// Generate .pc files from .pc.tmpl files
+// setPrefix can generate .pc files from .pc.tmpl files
 func (c *ghReleasesInstaller) setPrefix(outputDir string) error {
 	absOutputDir, err := filepath.Abs(outputDir)
 	if err != nil {
@@ -228,7 +229,7 @@ func (c *ghReleasesInstaller) setPrefix(outputDir string) error {
 	}
 
 	// move to path where .pc files are stored
-	pkgConfigPath := filepath.Join(outputDir, "lib/pkgconfig")
+	pkgConfigPath := filepath.Join(outputDir, "lib", "pkgconfig")
 
 	pcTmpls, err := filepath.Glob(filepath.Join(pkgConfigPath, "*.pc.tmpl"))
 	if err != nil {
@@ -247,17 +248,14 @@ func (c *ghReleasesInstaller) setPrefix(outputDir string) error {
 		if err != nil {
 			return err
 		}
+
+		pcFilePath := filepath.Join(pkgConfigPath, strings.TrimSuffix(tmplName, ".tmpl"))
+		var buf bytes.Buffer
 		// The Prefix field specifies the absolute path to the output directory,
 		// which is used to replace placeholders in the .pc template files.
-		data := struct {
-			Prefix string
-		}{
-			Prefix: absOutputDir,
-		}
-		pcFilePath := filepath.Join(pkgConfigPath, strings.TrimSuffix(tmplName, ".tmpl"))
-
-		var buf bytes.Buffer
-		if err := tmpl.Execute(&buf, data); err != nil {
+		if err := tmpl.Execute(&buf, map[string]any{
+			"Prefix": absOutputDir,
+		}); err != nil {
 			return err
 		}
 		if err := os.WriteFile(pcFilePath, buf.Bytes(), 0644); err != nil {
@@ -266,7 +264,7 @@ func (c *ghReleasesInstaller) setPrefix(outputDir string) error {
 		// remove .pc.tmpl file
 		err = os.Remove(filepath.Join(pkgConfigPath, tmplName))
 		if err != nil {
-			return errors.Join(errors.New("failed to remove template file: "), err)
+			return fmt.Errorf("failed to remove template file: %w", err)
 		}
 	}
 
