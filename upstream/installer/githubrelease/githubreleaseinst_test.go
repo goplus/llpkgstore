@@ -72,7 +72,6 @@ func verify(installDir string) error {
 		}
 		// 3. ensure pkg-config can find .pc file
 		buildCmd := exec.Command("pkg-config", "--libs", strings.TrimRight(filepath.Base(pcFile), ".pc"))
-		println(buildCmd.String())
 		pc.SetPath(buildCmd, absPath)
 		out, err := buildCmd.CombinedOutput()
 		if err != nil {
