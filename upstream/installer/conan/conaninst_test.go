@@ -9,7 +9,7 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/goplus/llpkgstore/internal/actions/pc"
+	"github.com/goplus/llpkgstore/internal/pc"
 	"github.com/goplus/llpkgstore/upstream"
 )
 

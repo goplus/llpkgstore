@@ -9,10 +9,10 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/goplus/llpkgstore/internal/actions/file"
 	"github.com/goplus/llpkgstore/internal/actions/generator"
 	"github.com/goplus/llpkgstore/internal/actions/hashutils"
-	"github.com/goplus/llpkgstore/internal/actions/pc"
+	"github.com/goplus/llpkgstore/internal/file"
+	"github.com/goplus/llpkgstore/internal/pc"
 )
 
 var (
@@ -37,7 +37,7 @@ const (
 // canHash check file is hashable.
 // Hashable file: *.go / llcppg.pub / *.symb.json
 func canHash(fileName string) bool {
-	if strings.Contains(fileName, ".go") {
+	if strings.HasSuffix(fileName, ".go") {
 		return true
 	}
 	_, ok := canHashFile[fileName]

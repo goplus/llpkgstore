@@ -8,9 +8,9 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/goplus/llpkgstore/internal/actions/file"
-	"github.com/goplus/llpkgstore/internal/actions/pc"
 	"github.com/goplus/llpkgstore/internal/cmdbuilder"
+	"github.com/goplus/llpkgstore/internal/file"
+	"github.com/goplus/llpkgstore/internal/pc"
 	"github.com/goplus/llpkgstore/upstream"
 )
 
@@ -33,56 +33,25 @@ const (
 
 // in Conan, actual binary path is in the prefix field of *.pc file
 func (c *conanInstaller) findBinaryPathFromPC(pkg upstream.Package, dir string, installOutput []byte) (string, string, error) {
-	var m map[string]any
+	var m conanOutput
 	json.Unmarshal(installOutput, &m)
 
-	if len(m) == 0 {
+	if len(m.Graph.Nodes) == 0 {
 		return "", "", ErrPackageNotFound
 	}
+	// default to package name.
+	pkgConfigName := pkg.Name
 
-	graphMap, ok := m["graph"].(map[string]any)
-	if !ok {
-		return "", "", ErrPackageNotFound
-	}
+	for _, packageInfo := range m.Graph.Nodes {
+		realPCName := packageInfo.CppInfo.Root.Properties.PkgName
 
-	nodeMap, ok := graphMap["nodes"].(map[string]any)
-	if !ok {
-		return "", "", ErrPackageNotFound
-	}
-
-	var pkgConfigName string
-
-	for _, packageInfo := range nodeMap {
-		packageInfoMap := packageInfo.(map[string]any)
-
-		packageName, ok := packageInfoMap["name"].(string)
-
-		if ok && packageName == pkg.Name {
+		if packageInfo.Name == pkg.Name && realPCName != "" {
 			// ok this is the result we want
-			cppInfo, ok := packageInfoMap["cpp_info"].(map[string]any)
-			if !ok {
-				continue
-			}
-			root, ok := cppInfo["root"].(map[string]any)
-			if !ok {
-				continue
-			}
-			properties, ok := root["properties"].(map[string]any)
-			if !ok {
-				continue
-			}
-			name, ok := properties["pkg_config_name"].(string)
-			if !ok {
-				continue
-			}
-			pkgConfigName = name
+			pkgConfigName = realPCName
 			break
 		}
 	}
-	if pkgConfigName == "" {
-		// if pkg-config name is not specified, default to package name.
-		pkgConfigName = pkg.Name
-	}
+
 	pcFile, err := os.ReadFile(filepath.Join(dir, pkgConfigName+".pc"))
 	if err != nil {
 		return "", "", err
