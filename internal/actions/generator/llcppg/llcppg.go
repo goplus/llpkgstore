@@ -9,10 +9,10 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/goplus/llpkgstore/internal/actions/file"
 	"github.com/goplus/llpkgstore/internal/actions/generator"
-	"github.com/goplus/llpkgstore/internal/actions/hashutils"
-	"github.com/goplus/llpkgstore/internal/actions/pc"
+	"github.com/goplus/llpkgstore/internal/file"
+	"github.com/goplus/llpkgstore/internal/hashutils"
+	"github.com/goplus/llpkgstore/internal/pc"
 )
 
 var (
@@ -21,8 +21,8 @@ var (
 		"go.mod":     {},
 		"go.sum":     {},
 	}
-	ErrLlcppgGenerate = errors.New("llcppg: cannot generate: ")
-	ErrLlcppgCheck    = errors.New("llcppg: check fail: ")
+	ErrLLCppgGenerate = errors.New("llcppg: cannot generate: ")
+	ErrLLCppgCheck    = errors.New("llcppg: check fail: ")
 )
 
 const (
@@ -37,7 +37,7 @@ const (
 // canHash check file is hashable.
 // Hashable file: *.go / llcppg.pub / *.symb.json
 func canHash(fileName string) bool {
-	if strings.Contains(fileName, ".go") {
+	if strings.HasSuffix(fileName, ".go") {
 		return true
 	}
 	_, ok := canHashFile[fileName]
@@ -117,10 +117,10 @@ func (l *llcppgGenerator) copyConfigFileTo(path string) error {
 func (l *llcppgGenerator) Generate(toDir string) error {
 	path, err := filepath.Abs(toDir)
 	if err != nil {
-		return errors.Join(ErrLlcppgGenerate, err)
+		return errors.Join(ErrLLCppgGenerate, err)
 	}
 	if err := l.copyConfigFileTo(path); err != nil {
-		return errors.Join(ErrLlcppgGenerate, err)
+		return errors.Join(ErrLLCppgGenerate, err)
 	}
 	cmd := exec.Command("llcppg", "-mod", l.normalizeModulePath(), llcppgConfigFile)
 	cmd.Dir = path
@@ -131,19 +131,19 @@ func (l *llcppgGenerator) Generate(toDir string) error {
 	// llcppg may exit with an error, which may be caused by Stderr.
 	// To avoid that case, we have to check its exit code.
 	if err := cmd.Run(); isExitedUnexpectedly(err) {
-		return errors.Join(ErrLlcppgGenerate, err)
+		return errors.Join(ErrLLCppgGenerate, err)
 	}
 	// check output again
 	generatedPath := filepath.Join(path, l.packageName)
 	if _, err := os.Stat(generatedPath); os.IsNotExist(err) {
-		return errors.Join(ErrLlcppgCheck, errors.New("generate fail"))
+		return errors.Join(ErrLLCppgCheck, errors.New("generate fail"))
 	}
 	// copy out the generated result
 	// be careful: llcppg result MUST not override existed file,
 	// otherwise, checking is meaningless.
 	err = file.CopyFS(path, os.DirFS(generatedPath), true)
 	if err != nil {
-		return errors.Join(ErrLlcppgGenerate, err)
+		return errors.Join(ErrLLCppgGenerate, err)
 	}
 
 	os.RemoveAll(generatedPath)
@@ -153,17 +153,17 @@ func (l *llcppgGenerator) Generate(toDir string) error {
 func (l *llcppgGenerator) Check(dir string) error {
 	baseDir, err := filepath.Abs(dir)
 	if err != nil {
-		return errors.Join(ErrLlcppgCheck, err)
+		return errors.Join(ErrLLCppgCheck, err)
 	}
 
 	// 1. compute hash
 	generated, err := hashutils.Dir(baseDir, canHash)
 	if err != nil {
-		return errors.Join(ErrLlcppgCheck, err)
+		return errors.Join(ErrLLCppgCheck, err)
 	}
 	userGenerated, err := hashutils.Dir(l.dir, canHash)
 	if err != nil {
-		return errors.Join(ErrLlcppgCheck, err)
+		return errors.Join(ErrLLCppgCheck, err)
 	}
 
 	// 2. check hash
@@ -173,20 +173,20 @@ func (l *llcppgGenerator) Check(dir string) error {
 			// if this file is hashable, it's unexpected
 			// if not, we can skip it safely.
 			if canHash(name) {
-				return errors.Join(ErrLlcppgCheck, fmt.Errorf("unexpected file: %s", name))
+				return errors.Join(ErrLLCppgCheck, fmt.Errorf("unexpected file: %s", name))
 			}
 			// skip file
 			continue
 		}
 		if !bytes.Equal(hash, generatedHash) {
-			return errors.Join(ErrLlcppgCheck, fmt.Errorf("file not equal: %s %s", name,
+			return errors.Join(ErrLLCppgCheck, fmt.Errorf("file not equal: %s %s", name,
 				diffTwoFiles(filepath.Join(l.dir, name), filepath.Join(baseDir, name))))
 		}
 	}
 	// 3. check missing file
 	for name := range generated {
 		if _, ok := userGenerated[name]; !ok {
-			return errors.Join(ErrLlcppgCheck, fmt.Errorf("missing file: %s", name))
+			return errors.Join(ErrLLCppgCheck, fmt.Errorf("missing file: %s", name))
 		}
 	}
 	return nil

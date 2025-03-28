@@ -129,8 +129,8 @@ func isValidLLPkg(files []os.DirEntry) bool {
 		fileMap[filepath.Base(file.Name())] = struct{}{}
 	}
 	_, hasLLPkg := fileMap["llpkg.cfg"]
-	_, hasLlcppg := fileMap["llcppg.cfg"]
-	return hasLlcppg && hasLLPkg
+	_, hasLLCppg := fileMap["llcppg.cfg"]
+	return hasLLCppg && hasLLPkg
 }
 
 // checkLegacyVersion validates versioning strategy for legacy package submissions

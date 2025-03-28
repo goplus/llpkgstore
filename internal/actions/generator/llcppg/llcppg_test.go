@@ -10,7 +10,7 @@ import (
 	"testing"
 
 	"github.com/goplus/llpkgstore/config"
-	"github.com/goplus/llpkgstore/internal/actions/hashutils"
+	"github.com/goplus/llpkgstore/internal/hashutils"
 	"golang.org/x/mod/modfile"
 )
 
@@ -23,7 +23,7 @@ const (
     }
   }
 }`
-	testLlcppgConfig = `{
+	testLLCppgConfig = `{
     "name": "cjson",
     "cflags": "$(pkg-config --cflags cjson)",
     "libs": "$(pkg-config --libs cjson)",
@@ -86,13 +86,48 @@ func TestHash(t *testing.T) {
 	}
 }
 
-func TestLlcppg(t *testing.T) {
+func TestLLCppgCanHash(t *testing.T) {
+	expected := []struct {
+		name     string
+		expected bool
+	}{{
+		name:     "ttt.go",
+		expected: true,
+	}, {
+		name:     "llcppg.pub",
+		expected: true,
+	}, {
+		name:     "ttt.gogo",
+		expected: false,
+	},
+		{
+			name:     "",
+			expected: false,
+		},
+		{
+			name:     "go.mod",
+			expected: true,
+		},
+		{
+			name:     "go.sum",
+			expected: true,
+		},
+	}
+
+	for _, tt := range expected {
+		if canHash(tt.name) != tt.expected {
+			t.Errorf("unexpected canhash: %s want %v got: %v", tt.name, tt.expected, canHash(tt.name))
+		}
+	}
+}
+
+func TestLLCppg(t *testing.T) {
 	os.Mkdir("testgenerate", 0777)
 	defer os.RemoveAll("testgenerate")
 	path, _ := filepath.Abs("testgenerate")
 	generator := New(path, "cjson", path)
 
-	os.WriteFile("testgenerate/llcppg.cfg", []byte(testLlcppgConfig), 0755)
+	os.WriteFile("testgenerate/llcppg.cfg", []byte(testLLCppgConfig), 0755)
 	os.WriteFile("testgenerate/llpkg.cfg", []byte(testLLPkgConfig), 0755)
 
 	cfg, err := config.ParseLLPkgConfig("testgenerate/llpkg.cfg")
