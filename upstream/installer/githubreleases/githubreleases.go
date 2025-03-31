@@ -49,33 +49,33 @@ func (c *ghReleasesInstaller) Config() map[string]string {
 // Unlike conaninstaller which is used for GitHub Action to obtain binary files
 // this installer is used for `llgo get` to install binary files.
 // The first return value is an empty string, as the pkgConfigName is not necessary for this GitHub Release installer.
-func (c *ghReleasesInstaller) Install(pkg upstream.Package, outputDir string) (string, error) {
+func (c *ghReleasesInstaller) Install(pkg upstream.Package, outputDir string) ([]string, error) {
 	compressPath, err := c.download(c.assertUrl(pkg), outputDir)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 	if strings.HasSuffix(compressPath, ".tar.gz") {
 		err = c.untargz(outputDir, compressPath)
 		if err != nil {
-			return "", err
+			return nil, err
 		}
 	} else if strings.HasSuffix(compressPath, ".zip") {
 		err = c.unzip(outputDir, compressPath)
 		if err != nil {
-			return "", err
+			return nil, err
 		}
 	} else {
-		return "", errors.New("unsupported compressed file format")
+		return nil, errors.New("unsupported compressed file format")
 	}
 	err = os.Remove(compressPath)
 	if err != nil {
-		return "", fmt.Errorf("cannot delete compressed file: %w", err)
+		return nil, fmt.Errorf("cannot delete compressed file: %w", err)
 	}
 	err = c.setPrefix(outputDir)
 	if err != nil {
-		return "", fmt.Errorf("fail to reset .pc prefix: %w", err)
+		return nil, fmt.Errorf("fail to reset .pc prefix: %w", err)
 	}
-	return "", nil
+	return nil, nil
 }
 
 // Warning: not implemented

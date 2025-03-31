@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"reflect"
 	"runtime"
 	"slices"
 	"testing"
@@ -13,7 +14,7 @@ import (
 	"github.com/goplus/llpkgstore/upstream"
 )
 
-func TestConanInstaller(t *testing.T) {
+func TestConanCJSON(t *testing.T) {
 	c := &conanInstaller{
 		config: map[string]string{
 			"options": `cjson/*:utils=True`,
@@ -40,7 +41,10 @@ func TestConanInstaller(t *testing.T) {
 		t.Errorf("Install failed: %s", err)
 	}
 
-	t.Log(bp)
+	if !reflect.DeepEqual(bp, []string{"cjson", "libcjson", "libcjson_utils"}) {
+		t.Errorf("unexpected pc files: %v", bp)
+		return
+	}
 
 	if err := verify(tempDir, bp); err != nil {
 		t.Errorf("Verify failed: %s", err)
@@ -110,23 +114,25 @@ func TestConanSearch(t *testing.T) {
 
 }
 
-func verify(installDir, pkgConfigName string) error {
-	// 1. ensure .pc file exists
-	_, err := os.Stat(filepath.Join(installDir, pkgConfigName+".pc"))
-	if err != nil {
-		return errors.New(".pc file does not exist: " + err.Error())
-	}
-	absPath, err := filepath.Abs(installDir)
-	if err != nil {
-		return err
-	}
-	// 2. ensure pkg-config can find .pc file
-	buildCmd := exec.Command("pkg-config", "--cflags", pkgConfigName)
+func verify(installDir string, pkgConfigName []string) error {
+	for _, pkgName := range pkgConfigName {
+		// 1. ensure .pc file exists
+		_, err := os.Stat(filepath.Join(installDir, pkgName+".pc"))
+		if err != nil {
+			return errors.New(".pc file does not exist: " + err.Error())
+		}
+		absPath, err := filepath.Abs(installDir)
+		if err != nil {
+			return err
+		}
+		// 2. ensure pkg-config can find .pc file
+		buildCmd := exec.Command("pkg-config", "--cflags", pkgName)
 
-	pc.SetPath(buildCmd, absPath)
-	out, err := buildCmd.CombinedOutput()
-	if err != nil {
-		return errors.New("pkg-config failed: " + err.Error() + " with output: " + string(out))
+		pc.SetPath(buildCmd, absPath)
+		out, err := buildCmd.CombinedOutput()
+		if err != nil {
+			return errors.New("pkg-config failed: " + err.Error() + " with output: " + string(out))
+		}
 	}
 
 	switch runtime.GOOS {

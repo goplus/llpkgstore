@@ -527,7 +527,7 @@ func (d *DefaultClient) Release() {
 
 	tempDir, _ := os.MkdirTemp("", "llpkg-tool")
 
-	pcName, err := uc.Installer.Install(uc.Pkg, tempDir)
+	deps, err := uc.Installer.Install(uc.Pkg, tempDir)
 	must(err)
 
 	pkgConfigDir := filepath.Join(tempDir, "lib", "pkgconfig")
@@ -537,14 +537,15 @@ func (d *DefaultClient) Release() {
 	err = os.Mkdir(pkgConfigDir, 0777)
 	must(err)
 
-	pcFile := filepath.Join(tempDir, pcName+".pc")
+	for _, pcName := range deps {
+		pcFile := filepath.Join(tempDir, pcName+".pc")
+		// generate pc template to lib/pkgconfig
+		err = pc.GenerateTemplateFromPC(pcFile, pkgConfigDir, deps)
+		must(err)
+	}
 
-	// generate pc template to lib/pkgconfig
-	err = pc.GenerateTemplateFromPC(pcFile, pkgConfigDir)
-	must(err)
 	// okay, safe to remove old pc
-	os.Remove(pcFile)
-
+	file.RemovePattern(filepath.Join(tempDir, "*.pc"))
 	file.RemovePattern(filepath.Join(tempDir, "*.sh"))
 
 	zipFilePath, _ := filepath.Abs(binaryZip(uc.Pkg.Name))
