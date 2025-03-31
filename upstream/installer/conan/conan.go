@@ -34,7 +34,10 @@ const (
 // in Conan, actual binary path is in the prefix field of *.pc file
 func (c *conanInstaller) findBinaryPathFromPC(pkg upstream.Package, dir string, installOutput []byte) (string, string, error) {
 	var m conanOutput
-	json.Unmarshal(installOutput, &m)
+	err := json.Unmarshal(installOutput, &m)
+	if err != nil {
+		return "", "", err
+	}
 
 	if len(m.Graph.Nodes) == 0 {
 		return "", "", ErrPackageNotFound
