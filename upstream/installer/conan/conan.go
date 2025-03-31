@@ -32,44 +32,56 @@ const (
 )
 
 // in Conan, actual binary path is in the prefix field of *.pc file
-func (c *conanInstaller) findBinaryPathFromPC(pkg upstream.Package, dir string, installOutput []byte) (string, string, error) {
+func (c *conanInstaller) findBinaryPathFromPC(
+	pkg upstream.Package,
+	dir string,
+	installOutput []byte,
+) (
+	binaryDir string,
+	pcName string,
+	err error,
+) {
 	var m conanOutput
-	err := json.Unmarshal(installOutput, &m)
+	err = json.Unmarshal(installOutput, &m)
 	if err != nil {
-		return "", "", err
+		return
 	}
 
 	if len(m.Graph.Nodes) == 0 {
-		return "", "", ErrPackageNotFound
+		err = ErrPackageNotFound
+		return
 	}
 	// default to package name.
-	pkgConfigName := pkg.Name
+	pcName = pkg.Name
 
 	for _, packageInfo := range m.Graph.Nodes {
 		realPCName := packageInfo.CppInfo.Root.Properties.PkgName
 
 		if packageInfo.Name == pkg.Name && realPCName != "" {
 			// ok this is the result we want
-			pkgConfigName = realPCName
+			pcName = realPCName
 			break
 		}
 	}
 
-	pcFile, err := os.ReadFile(filepath.Join(dir, pkgConfigName+".pc"))
+	pcFile, err := os.ReadFile(filepath.Join(dir, pcName+".pc"))
 	if err != nil {
-		return "", "", err
+		return
 	}
 	matches := pc.PrefixMatch.FindSubmatch(pcFile)
 	if len(matches) != 2 {
-		return "", "", ErrPCFileNotFound
+		err = ErrPCFileNotFound
+		return
 	}
-	binaryDir := string(matches[1])
+	binaryDir = string(matches[1])
 	// check dir
 	fs, err := os.Stat(binaryDir)
 	if err != nil || !fs.IsDir() {
-		return "", "", ErrPCFileNotFound
+		if err == nil {
+			err = ErrPCFileNotFound
+		}
 	}
-	return binaryDir, pkgConfigName, nil
+	return
 }
 
 // conanInstaller implements the upstream.Installer interface using the Conan package manager.
