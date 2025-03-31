@@ -52,7 +52,7 @@ func runLLCppgGenerateWithDir(dir string) {
 	file.CopyFilePattern(tempDir, dir, "*.pc")
 	// try llcppcfg if llcppg.cfg dones't exist
 	if _, err := os.Stat(filepath.Join(dir, "llcppg.cfg")); os.IsNotExist(err) {
-		cmd := exec.Command("llcppcfg", pcName)
+		cmd := exec.Command("llcppcfg", pcName[0])
 		cmd.Dir = dir
 		pc.SetPath(cmd, tempDir)
 		ret, err := cmd.CombinedOutput()
