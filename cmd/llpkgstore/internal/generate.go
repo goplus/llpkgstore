@@ -7,9 +7,9 @@ import (
 	"path/filepath"
 
 	"github.com/goplus/llpkgstore/config"
-	"github.com/goplus/llpkgstore/internal/actions/file"
 	"github.com/goplus/llpkgstore/internal/actions/generator/llcppg"
-	"github.com/goplus/llpkgstore/internal/actions/pc"
+	"github.com/goplus/llpkgstore/internal/file"
+	"github.com/goplus/llpkgstore/internal/pc"
 	"github.com/spf13/cobra"
 )
 

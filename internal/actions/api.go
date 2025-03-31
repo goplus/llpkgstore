@@ -13,9 +13,9 @@ import (
 
 	"github.com/google/go-github/v69/github"
 	"github.com/goplus/llpkgstore/config"
-	"github.com/goplus/llpkgstore/internal/actions/file"
-	"github.com/goplus/llpkgstore/internal/actions/pc"
 	"github.com/goplus/llpkgstore/internal/actions/versions"
+	"github.com/goplus/llpkgstore/internal/file"
+	"github.com/goplus/llpkgstore/internal/pc"
 )
 
 const (
@@ -482,6 +482,16 @@ func (d *DefaultClient) Postprocessing() {
 		panic("no mapped version found in the commit message")
 	}
 
+	clib, mappedVersion := parseMappedVersion(version)
+
+	// the pr has merged, so we can read it.
+	cfg, err := config.ParseLLPkgConfig(filepath.Join(clib, "llpkg.cfg"))
+	must(err)
+
+	// write it to llpkgstore.json
+	ver := versions.Read("llpkgstore.json")
+	ver.Write(clib, cfg.Upstream.Package.Version, mappedVersion)
+
 	if hasTag(version) {
 		panic("tag has already existed")
 	}
@@ -492,16 +502,6 @@ func (d *DefaultClient) Postprocessing() {
 
 	// create a release
 	d.createReleaseByTag(version)
-
-	clib, mappedVersion := parseMappedVersion(version)
-
-	// the pr has merged, so we can read it.
-	cfg, err := config.ParseLLPkgConfig(filepath.Join(clib, "llpkg.cfg"))
-	must(err)
-
-	// write it to llpkgstore.json
-	ver := versions.Read("llpkgstore.json")
-	ver.Write(clib, cfg.Upstream.Package.Version, mappedVersion)
 
 	// we have finished tagging the commit, safe to remove the branch
 	if branchName, isLegacy := d.isLegacyVersion(); isLegacy {
@@ -526,7 +526,8 @@ func (d *DefaultClient) Release() {
 	must(err)
 
 	tempDir, _ := os.MkdirTemp("", "llpkg-tool")
-	_, err = uc.Installer.Install(uc.Pkg, tempDir)
+
+	pcName, err := uc.Installer.Install(uc.Pkg, tempDir)
 	must(err)
 
 	pkgConfigDir := filepath.Join(tempDir, "lib", "pkgconfig")
@@ -535,20 +536,14 @@ func (d *DefaultClient) Release() {
 
 	err = os.Mkdir(pkgConfigDir, 0777)
 	must(err)
-	pcFiles := filepath.Join(tempDir, "*.pc")
 
-	matches, _ := filepath.Glob(pcFiles)
+	pcFile := filepath.Join(tempDir, pcName+".pc")
 
-	if len(matches) == 0 {
-		panic("no pc file found, this should not happen")
-	}
 	// generate pc template to lib/pkgconfig
-	for _, matchPC := range matches {
-		err := pc.GenerateTemplateFromPC(matchPC, pkgConfigDir)
-		must(err)
-		// okay, safe to remove old pc
-		os.Remove(matchPC)
-	}
+	err = pc.GenerateTemplateFromPC(pcFile, pkgConfigDir)
+	must(err)
+	// okay, safe to remove old pc
+	os.Remove(pcFile)
 
 	file.RemovePattern(filepath.Join(tempDir, "*.sh"))
 
@@ -556,7 +551,6 @@ func (d *DefaultClient) Release() {
 
 	err = file.Zip(tempDir, zipFilePath)
 	must(err)
-
 	release := d.getReleaseByTag(version)
 
 	// upload file to release

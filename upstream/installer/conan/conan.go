@@ -8,9 +8,9 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/goplus/llpkgstore/internal/actions/file"
-	"github.com/goplus/llpkgstore/internal/actions/pc"
 	"github.com/goplus/llpkgstore/internal/cmdbuilder"
+	"github.com/goplus/llpkgstore/internal/file"
+	"github.com/goplus/llpkgstore/internal/pc"
 	"github.com/goplus/llpkgstore/upstream"
 )
 
@@ -32,72 +32,56 @@ const (
 )
 
 // in Conan, actual binary path is in the prefix field of *.pc file
-func (c *conanInstaller) findBinaryPathFromPC(pkg upstream.Package, dir string, installOutput []byte) (string, string, error) {
-	var m map[string]any
-	json.Unmarshal(installOutput, &m)
-
-	if len(m) == 0 {
-		return "", "", ErrPackageNotFound
+func (c *conanInstaller) findBinaryPathFromPC(
+	pkg upstream.Package,
+	dir string,
+	installOutput []byte,
+) (
+	binaryDir string,
+	pcName string,
+	err error,
+) {
+	var m conanOutput
+	err = json.Unmarshal(installOutput, &m)
+	if err != nil {
+		return
 	}
 
-	graphMap, ok := m["graph"].(map[string]any)
-	if !ok {
-		return "", "", ErrPackageNotFound
+	if len(m.Graph.Nodes) == 0 {
+		err = ErrPackageNotFound
+		return
 	}
+	// default to package name.
+	pcName = pkg.Name
 
-	nodeMap, ok := graphMap["nodes"].(map[string]any)
-	if !ok {
-		return "", "", ErrPackageNotFound
-	}
+	for _, packageInfo := range m.Graph.Nodes {
+		realPCName := packageInfo.CppInfo.Root.Properties.PkgName
 
-	var pkgConfigName string
-
-	for _, packageInfo := range nodeMap {
-		packageInfoMap := packageInfo.(map[string]any)
-
-		packageName, ok := packageInfoMap["name"].(string)
-
-		if ok && packageName == pkg.Name {
+		if packageInfo.Name == pkg.Name && realPCName != "" {
 			// ok this is the result we want
-			cppInfo, ok := packageInfoMap["cpp_info"].(map[string]any)
-			if !ok {
-				continue
-			}
-			root, ok := cppInfo["root"].(map[string]any)
-			if !ok {
-				continue
-			}
-			properties, ok := root["properties"].(map[string]any)
-			if !ok {
-				continue
-			}
-			name, ok := properties["pkg_config_name"].(string)
-			if !ok {
-				continue
-			}
-			pkgConfigName = name
+			pcName = realPCName
 			break
 		}
 	}
-	if pkgConfigName == "" {
-		// if pkg-config name is not specified, default to package name.
-		pkgConfigName = pkg.Name
-	}
-	pcFile, err := os.ReadFile(filepath.Join(dir, pkgConfigName+".pc"))
+
+	pcFile, err := os.ReadFile(filepath.Join(dir, pcName+".pc"))
 	if err != nil {
-		return "", "", err
+		return
 	}
 	matches := pc.PrefixMatch.FindSubmatch(pcFile)
 	if len(matches) != 2 {
-		return "", "", ErrPCFileNotFound
+		err = ErrPCFileNotFound
+		return
 	}
-	binaryDir := string(matches[1])
+	binaryDir = string(matches[1])
 	// check dir
 	fs, err := os.Stat(binaryDir)
 	if err != nil || !fs.IsDir() {
-		return "", "", ErrPCFileNotFound
+		if err == nil {
+			err = ErrPCFileNotFound
+		}
 	}
-	return binaryDir, pkgConfigName, nil
+	return
 }
 
 // conanInstaller implements the upstream.Installer interface using the Conan package manager.
