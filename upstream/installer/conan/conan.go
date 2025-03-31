@@ -31,6 +31,19 @@ const (
 	%s`
 )
 
+func retrievePC(cppInfo map[string]cppInfo) (pcNames []string) {
+	for name, info := range cppInfo {
+		// skip itself
+		if name == "root" {
+			continue
+		}
+		if info.Properties.PkgName != "" {
+			pcNames = append(pcNames, info.Properties.PkgName)
+		}
+	}
+	return
+}
+
 // in Conan, actual binary path is in the prefix field of *.pc file
 func (c *conanInstaller) findBinaryPathFromPC(
 	pkg upstream.Package,
@@ -38,7 +51,7 @@ func (c *conanInstaller) findBinaryPathFromPC(
 	installOutput []byte,
 ) (
 	binaryDir string,
-	pcName string,
+	pcName []string,
 	err error,
 ) {
 	var m conanOutput
@@ -51,20 +64,30 @@ func (c *conanInstaller) findBinaryPathFromPC(
 		err = ErrPackageNotFound
 		return
 	}
-	// default to package name.
-	pcName = pkg.Name
+
+	// default to package name,
+	// first element is the real pkg-config name of this package
+	// use append here to avoid resizing slice again.
+	pcName = append(pcName, pkg.Name)
 
 	for _, packageInfo := range m.Graph.Nodes {
-		realPCName := packageInfo.CppInfo.Root.Properties.PkgName
-
-		if packageInfo.Name == pkg.Name && realPCName != "" {
-			// ok this is the result we want
-			pcName = realPCName
-			break
+		if packageInfo.Name != pkg.Name {
+			continue
 		}
+		// root must exist, this should not happen, returns an error.
+		root, ok := packageInfo.CppInfo["root"]
+		if !ok {
+			err = ErrPackageNotFound
+			return
+		}
+		if root.Properties.PkgName != "" {
+			// root is the real pkg config name, replace instead.
+			pcName[0] = root.Properties.PkgName
+		}
+		pcName = append(pcName, retrievePC(packageInfo.CppInfo)...)
 	}
 
-	pcFile, err := os.ReadFile(filepath.Join(dir, pcName+".pc"))
+	pcFile, err := os.ReadFile(filepath.Join(dir, pcName[0]+".pc"))
 	if err != nil {
 		return
 	}
@@ -116,7 +139,7 @@ func (c *conanInstaller) options() []string {
 // Install executes Conan installation for the specified package into the output directory.
 // It generates a conan install command with required options,
 // and handles installation artifacts generation (e.g., .pc files).
-func (c *conanInstaller) Install(pkg upstream.Package, outputDir string) (string, error) {
+func (c *conanInstaller) Install(pkg upstream.Package, outputDir string) ([]string, error) {
 	// Build the following command
 	// conan install --requires %s -g PkgConfigDeps --options \\*:shared=True --build=missing --output-folder=%s\
 	builder := cmdbuilder.NewCmdBuilder(cmdbuilder.WithConanSerializer())
@@ -140,16 +163,16 @@ func (c *conanInstaller) Install(pkg upstream.Package, outputDir string) (string
 	ret, err := buildCmd.Output()
 	if err != nil {
 		// fmt.Println(string(out))
-		return "", err
+		return nil, err
 	}
 	binaryDir, pkgConfigName, err := c.findBinaryPathFromPC(pkg, outputDir, ret)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
 	err = file.CopyFS(outputDir, os.DirFS(binaryDir), false)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
 	return pkgConfigName, nil

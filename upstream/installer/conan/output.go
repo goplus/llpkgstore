@@ -5,14 +5,12 @@ type properties struct {
 }
 
 type cppInfo struct {
-	Root struct {
-		Properties properties `json:"properties"`
-	} `json:"root"`
+	Properties properties `json:"properties"`
 }
 
 type packageInfo struct {
-	Name    string  `json:"name"`
-	CppInfo cppInfo `json:"cpp_info"`
+	Name    string             `json:"name"`
+	CppInfo map[string]cppInfo `json:"cpp_info"`
 }
 
 type conanOutput struct {
