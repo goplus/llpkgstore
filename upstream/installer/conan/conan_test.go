@@ -8,6 +8,7 @@ import (
 	"reflect"
 	"runtime"
 	"slices"
+	"sort"
 	"testing"
 
 	"github.com/goplus/llpkgstore/internal/pc"
@@ -41,6 +42,7 @@ func TestConanCJSON(t *testing.T) {
 		t.Errorf("Install failed: %s", err)
 	}
 
+	sort.Strings(bp)
 	if !reflect.DeepEqual(bp, []string{"cjson", "libcjson", "libcjson_utils"}) {
 		t.Errorf("unexpected pc files: %v", bp)
 		return
