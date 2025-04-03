@@ -14,6 +14,7 @@ jobs:
         go:
           - 1.22.x
           - 1.23.x
+        llgo: [v0.10.1]
         llcppg: [v0.2.1]
     steps:
       - name: Check out code
@@ -23,6 +24,7 @@ jobs:
         with:
           repository: 'goplus/llgo'
           path: .llgo
+          ref: ${{matrix.llgo}}
       - name: Check out LLCppg
         uses: actions/checkout@v4
         with:
