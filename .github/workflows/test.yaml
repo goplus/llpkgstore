@@ -14,7 +14,7 @@ jobs:
         go:
           - 1.22.x
           - 1.23.x
-        llcppg: [v0.2.0]
+        llcppg: [v0.2.1]
     steps:
       - name: Check out code
         uses: actions/checkout@v4
