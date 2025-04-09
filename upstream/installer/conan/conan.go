@@ -31,7 +31,7 @@ const (
 	%s`
 )
 
-func retrievePC(cppInfo map[string]cppInfo) (pcNames []string) {
+func retrievePCNames(cppInfo map[string]cppInfo) (pcNames []string) {
 	for name, info := range cppInfo {
 		// skip itself
 		if name == "root" {
@@ -44,18 +44,65 @@ func retrievePC(cppInfo map[string]cppInfo) (pcNames []string) {
 	return
 }
 
+func buildDependenciesMap(depsInfo dependencyInfo) map[string]string {
+	deps := map[string]string{}
+
+	// conan require info format: zlib/1.3.Z
+	// 1.3.Z means match the major and minor version with 1.3
+	for _, dep := range depsInfo.Requires {
+		clib, version, ok := strings.Cut(dep, "/")
+		if ok && version != "system" {
+			deps[clib] = ""
+		}
+	}
+
+	return deps
+}
+
+func resolveDependencies(graphInfo graphInfo) (dependencies []upstream.Package) {
+	// 1. find require info from conan graph
+	requireMap := buildDependenciesMap(graphInfo.Info)
+
+	for _, info := range graphInfo.Dependencies {
+		if info.Ref == "" {
+			continue
+		}
+		clib, version, ok := strings.Cut(info.Ref, "/")
+		if !ok {
+			continue
+		}
+		// 2. fill the computed version from conan graph
+		// by the way, remove duplicate elements.
+		if _, ok := requireMap[clib]; ok {
+			requireMap[clib] = version
+		}
+	}
+
+	for clib, version := range requireMap {
+		if version == "" {
+			continue
+		}
+		dependencies = append(dependencies, upstream.Package{
+			Name:    clib,
+			Version: version,
+		})
+	}
+
+	return
+}
+
 // in Conan, actual binary path is in the prefix field of *.pc file
 func (c *conanInstaller) findBinaryPathFromPC(
 	pkg upstream.Package,
 	dir string,
-	installOutput []byte,
+	output []byte,
 ) (
 	binaryDir string,
 	pcName []string,
 	err error,
 ) {
-	var m conanOutput
-	err = json.Unmarshal(installOutput, &m)
+	var m installOutput
+	err = json.Unmarshal(output, &m)
 	if err != nil {
 		return
 	}
@@ -71,20 +118,20 @@ func (c *conanInstaller) findBinaryPathFromPC(
 	pcName = append(pcName, pkg.Name)
 
 	for _, packageInfo := range m.Graph.Nodes {
-		if packageInfo.Name != pkg.Name {
-			continue
+		if packageInfo.Name == pkg.Name {
+			// root must exist, this should not happen, returns an error.
+			root, ok := packageInfo.CppInfo["root"]
+			if !ok {
+				err = ErrPackageNotFound
+				return
+			}
+			if root.Properties.PkgName != "" {
+				// root is the real pkg config name, replace instead.
+				pcName[0] = root.Properties.PkgName
+			}
+			pcName = append(pcName, retrievePCNames(packageInfo.CppInfo)...)
+			break
 		}
-		// root must exist, this should not happen, returns an error.
-		root, ok := packageInfo.CppInfo["root"]
-		if !ok {
-			err = ErrPackageNotFound
-			return
-		}
-		if root.Properties.PkgName != "" {
-			// root is the real pkg config name, replace instead.
-			pcName[0] = root.Properties.PkgName
-		}
-		pcName = append(pcName, retrievePC(packageInfo.CppInfo)...)
 	}
 
 	pcFile, err := os.ReadFile(filepath.Join(dir, pcName[0]+".pc"))
@@ -210,4 +257,41 @@ func (c *conanInstaller) Search(pkg upstream.Package) ([]string, error) {
 	}
 
 	return ret, nil
+}
+
+// Dependency retrieves the dependencies of a package using Conan's graph info command.
+// It parses the dependency graph to extract required packages and their versions.
+func (c *conanInstaller) Dependency(pkg upstream.Package) (dependencies []upstream.Package, err error) {
+	// conan graph info --requires %s
+	builder := cmdbuilder.NewCmdBuilder(cmdbuilder.WithConanSerializer())
+
+	builder.SetName("conan")
+	builder.SetSubcommand("graph")
+	builder.SetObj("info")
+	builder.SetArg("requires", pkg.Name+"/"+pkg.Version)
+	builder.SetArg("format", "json")
+
+	cmd := builder.Cmd()
+	out, err := cmd.Output()
+	if err != nil {
+		return
+	}
+
+	var m graphOutput
+	err = json.Unmarshal(out, &m)
+	if err != nil {
+		return
+	}
+	if len(m.Graph.Nodes) == 0 {
+		err = ErrPackageNotFound
+		return
+	}
+
+	for _, graphInfo := range m.Graph.Nodes {
+		if graphInfo.Name == pkg.Name {
+			dependencies = resolveDependencies(graphInfo)
+			break
+		}
+	}
+	return
 }
