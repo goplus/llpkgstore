@@ -552,12 +552,8 @@ func (d *DefaultClient) Release() {
 
 	err = file.Zip(tempDir, zipFilePath)
 	must(err)
-	release := d.getReleaseByTag(version)
 
-	// upload file to release
-	err = d.uploadFileToRelease(zipFilePath, release)
-	must(err)
-
+	// upload to artifacts in GitHub Action
 }
 
 // CreateBranchFromLabel creates release branch based on label format
