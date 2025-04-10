@@ -129,37 +129,48 @@ func TestConanDependency(t *testing.T) {
 	c := &conanInstaller{
 		config: map[string]string{},
 	}
+	t.Run("fake", func(t *testing.T) {
+		pkg := upstream.Package{
+			Name:    "faketest1145141919",
+			Version: "3.2.6",
+		}
+		_, err := c.Dependency(pkg)
+		if err == nil {
+			t.Error("unexpected package")
+		}
+	})
+	t.Run("sdl", func(t *testing.T) {
+		pkg := upstream.Package{
+			Name:    "sdl",
+			Version: "3.2.6",
+		}
+		ver, err := c.Dependency(pkg)
+		if err != nil {
+			t.Error(err)
+			return
+		}
+		sort.Sort(packageSort(ver))
 
-	pkg := upstream.Package{
-		Name:    "sdl",
-		Version: "3.2.6",
-	}
-	ver, err := c.Dependency(pkg)
-	if err != nil {
-		t.Error(err)
-		return
-	}
-	sort.Sort(packageSort(ver))
+		t.Log(ver)
 
-	t.Log(ver)
-
-	expectedDeps := []upstream.Package{
-		{"libusb", "1.0.26"},
-		{"dbus", "1.15.8"},
-		{"libiconv", "1.17"},
-		{"libalsa", "1.2.12"},
-		{"wayland", "1.22.0"},
-		{"zlib", "1.3.1"},
-		{"xkbcommon", "1.6.0"},
-		{"libsndio", "1.9.0"},
-		{"pulseaudio", "17.0"},
-		{"libxml2", "2.13.6"},
-		{"expat", "2.7.1"},
-		{"libffi", "3.4.4"},
-	}
-	if !reflect.DeepEqual(ver, expectedDeps) {
-		t.Errorf("unexpected dependency for pcre: want %v got %v", expectedDeps, ver)
-	}
+		expectedDeps := []upstream.Package{
+			{"libusb", "1.0.26"},
+			{"dbus", "1.15.8"},
+			{"libiconv", "1.17"},
+			{"libalsa", "1.2.12"},
+			{"wayland", "1.22.0"},
+			{"zlib", "1.3.1"},
+			{"xkbcommon", "1.6.0"},
+			{"libsndio", "1.9.0"},
+			{"pulseaudio", "17.0"},
+			{"libxml2", "2.13.6"},
+			{"expat", "2.7.1"},
+			{"libffi", "3.4.4"},
+		}
+		if !reflect.DeepEqual(ver, expectedDeps) {
+			t.Errorf("unexpected dependency for pcre: want %v got %v", expectedDeps, ver)
+		}
+	})
 }
 
 func verify(installDir string, pkgConfigName []string) error {
