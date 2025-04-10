@@ -613,6 +613,9 @@ func (d *DefaultClient) Release() {
 	must(err)
 
 	// upload to artifacts in GitHub Action
+	Setenv(map[string]string{
+		"BIN_PATH": zipFilePath,
+	})
 }
 
 // CreateBranchFromLabel creates release branch based on label format
