@@ -4,11 +4,14 @@ package actions
 import (
 	"context"
 	"fmt"
+	"io"
 	"net/http"
 	"os"
+	"path"
 	"path/filepath"
 	"regexp"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/google/go-github/v69/github"
@@ -347,31 +350,76 @@ func (d *DefaultClient) createReleaseByTag(tag string) *github.RepositoryRelease
 	return release
 }
 
-func (d *DefaultClient) getReleaseByTag(tag string) *github.RepositoryRelease {
+func (d *DefaultClient) uploadFileToRelease(wg *sync.WaitGroup, fs *os.File, release *github.RepositoryRelease) {
 	ctx, cancel := context.WithTimeout(context.TODO(), 30*time.Second)
+	defer wg.Done()
 	defer cancel()
-
-	release, _, err := d.client.Repositories.GetReleaseByTag(ctx, d.owner, d.repo, tag)
-	must(err)
-	// ok we get the relase entry
-	return release
-}
-
-func (d *DefaultClient) uploadFileToRelease(fileName string, release *github.RepositoryRelease) error {
-	ctx, cancel := context.WithTimeout(context.TODO(), 30*time.Second)
-	defer cancel()
-
-	fs, err := os.Open(fileName)
-	must(err)
 	defer fs.Close()
 
-	_, _, err = d.client.Repositories.UploadReleaseAsset(
+	_, _, err := d.client.Repositories.UploadReleaseAsset(
 		ctx, d.owner, d.repo, release.GetID(),
 		&github.UploadOptions{
 			Name: filepath.Base(fs.Name()),
 		}, fs)
+	must(err)
+}
 
-	return err
+func (d *DefaultClient) downloadArtifactTo(fileCh chan *os.File, dir string, artifactID int64) {
+	ctx, cancel := context.WithTimeout(context.TODO(), 30*time.Second)
+	defer cancel()
+
+	url, _, err := d.client.Actions.DownloadArtifact(ctx, d.owner, d.repo,
+		artifactID, 0)
+
+	must(err)
+
+	httpClient := &http.Client{Timeout: 30 * time.Second}
+
+	resp, err := httpClient.Get(url.Path)
+	must(err)
+	defer resp.Body.Close()
+
+	filePath := filepath.Join(dir, path.Base(url.Path))
+
+	localFile, err := os.Create(filePath)
+	must(err)
+
+	fmt.Printf("Download %s to %s\n", url.Path, filePath)
+
+	_, err = io.Copy(localFile, resp.Request.Body)
+	must(err)
+
+	fileCh <- localFile
+}
+
+func (d *DefaultClient) downloadArtifacts() (files []*os.File) {
+	ctx, cancel := context.WithTimeout(context.TODO(), 30*time.Second)
+	defer cancel()
+
+	artifacts, _, err := d.client.Actions.ListWorkflowRunArtifacts(ctx, d.owner, d.repo,
+		WorkflowID(), &github.ListOptions{})
+
+	must(err)
+
+	if artifacts.GetTotalCount() == 0 {
+		panic("no artifact found")
+	}
+
+	tempDir, err := os.MkdirTemp("", "artfacts")
+	must(err)
+
+	fileCh := make(chan *os.File, len(artifacts.Artifacts))
+
+	for _, artifact := range artifacts.Artifacts {
+		go d.downloadArtifactTo(fileCh, tempDir, artifact.GetID())
+	}
+
+	for range artifacts.Artifacts {
+		file := <-fileCh
+
+		files = append(files, file)
+	}
+	return
 }
 
 // removeBranch deletes a branch from the repository
@@ -501,7 +549,18 @@ func (d *DefaultClient) Postprocessing() {
 	}
 
 	// create a release
-	d.createReleaseByTag(version)
+	release := d.createReleaseByTag(version)
+
+	files := d.downloadArtifacts()
+
+	var wg sync.WaitGroup
+	wg.Add(len(files))
+
+	for _, file := range files {
+		go d.uploadFileToRelease(&wg, file, release)
+	}
+
+	wg.Wait()
 
 	// we have finished tagging the commit, safe to remove the branch
 	if branchName, isLegacy := d.isLegacyVersion(); isLegacy {
