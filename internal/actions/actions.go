@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"runtime"
 	"slices"
@@ -80,46 +79,9 @@ func IssueEvent() map[string]any {
 	return issue
 }
 
-// tagRef constructs full Git tag reference string (e.g. "refs/tags/v1.0.0")
-func tagRef(tag string) string {
-	return "refs/tags/" + strings.TrimSpace(tag)
-}
-
 // branchRef generates full Git branch reference string (e.g. "refs/heads/main")
 func branchRef(branchName string) string {
 	return "refs/heads/" + strings.TrimSpace(branchName)
-}
-
-// hasTag checks if specified Git tag exists in repository
-func hasTag(tag string) bool {
-	_, err := exec.Command("git", "rev-parse", tagRef(tag)).CombinedOutput()
-	return err == nil
-}
-
-// shaFromTag retrieves commit SHA for given Git tag
-// Panics if tag doesn't exist
-func shaFromTag(tag string) string {
-	ret, err := exec.Command("git", "rev-list", "-n", "1", tag).CombinedOutput()
-	if err != nil {
-		log.Fatalf("cannot find a tag: %s %s", tag, string(ret))
-	}
-	return strings.TrimSpace(string(ret))
-}
-
-// parseMappedVersion splits the mapped version string into library name and version.
-// Input format: "clib/semver" where semver starts with 'v'
-// Panics if input format is invalid or version isn't valid semantic version
-func parseMappedVersion(version string) (clib, mappedVersion string) {
-	arr := strings.Split(version, "/")
-	if len(arr) != 2 {
-		panic("invalid mapped version format")
-	}
-	clib, mappedVersion = arr[0], arr[1]
-
-	if !semver.IsValid(mappedVersion) {
-		panic("invalid mapped version format: mappedVersion is not a semver")
-	}
-	return
 }
 
 // isValidLLPkg checks if directory contains both llpkg.cfg and llcppg.cfg
@@ -132,6 +94,14 @@ func isValidLLPkg(files []os.DirEntry) bool {
 	_, hasLLPkg := fileMap["llpkg.cfg"]
 	_, hasLLCppg := fileMap["llcppg.cfg"]
 	return hasLLCppg && hasLLPkg
+}
+
+func mustTrimPrefix(s, prefix string) string {
+	result := strings.TrimPrefix(s, prefix)
+	if result == s {
+		log.Fatalf("invalid format: %s", result)
+	}
+	return result
 }
 
 // checkLegacyVersion validates versioning strategy for legacy package submissions

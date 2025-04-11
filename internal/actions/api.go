@@ -16,6 +16,8 @@ import (
 
 	"github.com/google/go-github/v69/github"
 	"github.com/goplus/llpkgstore/config"
+	"github.com/goplus/llpkgstore/internal/actions/mappedversion"
+	"github.com/goplus/llpkgstore/internal/actions/tag"
 	"github.com/goplus/llpkgstore/internal/actions/versions"
 	"github.com/goplus/llpkgstore/internal/file"
 	"github.com/goplus/llpkgstore/internal/pc"
@@ -217,22 +219,25 @@ func (d *DefaultClient) removeLabel(labelName string) {
 // Panics:
 //
 //	If no valid version found in PR commits
-func (d *DefaultClient) checkMappedVersion(packageName string) (mappedVersion string) {
+func (d *DefaultClient) checkMappedVersion(packageName string) mappedversion.MappedVersion {
 	matchMappedVersion := regex(packageName)
+
+	var rawMappedVersion string
 
 	for _, commit := range d.currentPRCommit() {
 		message := commit.GetCommit().GetMessage()
-		if mappedVersion = matchMappedVersion.FindString(message); mappedVersion != "" {
+		if rawMappedVersion = matchMappedVersion.FindString(message); rawMappedVersion != "" {
 			// remove space, of course
-			mappedVersion = strings.TrimSpace(mappedVersion)
+			rawMappedVersion = strings.TrimSpace(rawMappedVersion)
 			break
 		}
 	}
 
-	if mappedVersion == "" {
+	if rawMappedVersion == "" {
 		panic("no MappedVersion found in the PR")
 	}
-	return
+
+	return mappedversion.From(rawMappedVersion)
 }
 
 // commitMessage retrieves commit details by SHA
@@ -270,10 +275,8 @@ func (d *DefaultClient) mappedVersion() string {
 	if mappedVersion == "" {
 		return ""
 	}
-	version := strings.TrimPrefix(mappedVersion, MappedVersionPrefix)
-	if version == mappedVersion {
-		panic("invalid format")
-	}
+	version := mustTrimPrefix(mappedVersion, MappedVersionPrefix)
+
 	return strings.TrimSpace(version)
 }
 
@@ -286,12 +289,12 @@ func (d *DefaultClient) mappedVersion() string {
 // Returns:
 //
 //	error: Error during tag creation
-func (d *DefaultClient) createTag(tag, sha string) error {
+func (d *DefaultClient) createTag(versionTag tag.Tag, sha string) error {
 	ctx, cancel := context.WithTimeout(context.TODO(), 30*time.Second)
 	defer cancel()
 
 	// tag the commit
-	tagRefName := tagRef(tag)
+	tagRefName := versionTag.Ref()
 	_, _, err := d.client.Git.CreateRef(ctx, d.owner, d.repo, &github.Reference{
 		Ref: &tagRefName,
 		Object: &github.GitObject{
@@ -441,8 +444,7 @@ func (d *DefaultClient) removeBranch(branchName string) error {
 func (d *DefaultClient) checkVersion(ver *versions.Versions, cfg config.LLPkgConfig) {
 	// 4. Check MappedVersion
 	version := d.checkMappedVersion(cfg.Upstream.Package.Name)
-	_, mappedVersion := parseMappedVersion(version)
-
+	_, mappedVersion := version.MustParse()
 	// 5. Check version is valid
 	_, isLegacy := d.isLegacyVersion()
 	checkLegacyVersion(ver, cfg, mappedVersion, isLegacy)
@@ -524,7 +526,7 @@ func (d *DefaultClient) Postprocessing() {
 		panic("no mapped version found in the commit message")
 	}
 
-	clib, mappedVersion := parseMappedVersion(version)
+	clib, mappedVersion := mappedversion.From(version).MustParse()
 
 	// the pr has merged, so we can read it.
 	cfg, err := config.ParseLLPkgConfig(filepath.Join(clib, "llpkg.cfg"))
@@ -534,11 +536,13 @@ func (d *DefaultClient) Postprocessing() {
 	ver := versions.Read("llpkgstore.json")
 	ver.Write(clib, cfg.Upstream.Package.Version, mappedVersion)
 
-	if hasTag(version) {
+	versionTag := tag.From(version)
+
+	if versionTag.Exist() {
 		panic("tag has already existed")
 	}
 
-	if err := d.createTag(version, sha); err != nil {
+	if err := d.createTag(versionTag, sha); err != nil {
 		panic(err)
 	}
 
@@ -561,7 +565,7 @@ func (d *DefaultClient) Release() {
 		panic("no mapped version found in the commit message")
 	}
 
-	clib, _ := parseMappedVersion(version)
+	clib, _ := mappedversion.From(version).MustParse()
 	// the pr has merged, so we can read it.
 	cfg, err := config.ParseLLPkgConfig(filepath.Join(clib, "llpkg.cfg"))
 	must(err)
@@ -609,20 +613,15 @@ func (d *DefaultClient) Release() {
 // Follows naming convention: release-branch.<CLibraryName>/<MappedVersion>
 func (d *DefaultClient) CreateBranchFromLabel(labelName string) {
 	// design: branch:release-branch.{CLibraryName}/{MappedVersion}
-	branchName := strings.TrimPrefix(strings.TrimSpace(labelName), LabelPrefix)
-	if branchName == labelName {
-		panic("invalid label name format")
-	}
+	branchName := mustTrimPrefix(strings.TrimSpace(labelName), LabelPrefix)
 
 	// fast-path: branch exists, can skip.
 	if d.hasBranch(branchName) {
 		return
 	}
-	version := strings.TrimPrefix(branchName, BranchPrefix)
-	if version == branchName {
-		panic("invalid label name format")
-	}
-	clib, _ := parseMappedVersion(version)
+	version := mustTrimPrefix(branchName, BranchPrefix)
+
+	clib, _ := mappedversion.From(version).MustParse()
 	// slow-path: check the condition if we can create a branch
 	//
 	// create a branch only when this version is legacy.
@@ -640,7 +639,7 @@ func (d *DefaultClient) CreateBranchFromLabel(labelName string) {
 		panic("c version dones't follow semver, skip maintaining.")
 	}
 
-	err := d.createBranch(branchName, shaFromTag(version))
+	err := d.createBranch(branchName, tag.From(version).SHA())
 	must(err)
 }
 
