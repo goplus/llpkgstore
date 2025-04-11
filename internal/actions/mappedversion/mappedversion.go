@@ -8,7 +8,8 @@ import (
 )
 
 var (
-	ErrVersionFormat = errors.New("invalid mapped version format: mappedVersion is not a semver")
+	ErrVersionFormat       = errors.New("invalid mapped version format")
+	ErrMappedVersionFormat = errors.New("invalid mapped version format: mappedVersion is not a semver")
 )
 
 type MappedVersion string
@@ -23,7 +24,8 @@ func From(version string) MappedVersion {
 func (m MappedVersion) Parse() (clib, mappedVersion string, err error) {
 	arr := strings.Split(string(m), "/")
 	if len(arr) != 2 {
-		panic("invalid mapped version format")
+		err = ErrVersionFormat
+		return
 	}
 	clib, mappedVersion = arr[0], arr[1]
 
