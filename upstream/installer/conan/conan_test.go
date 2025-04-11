@@ -217,28 +217,16 @@ func TestConanDependency(t *testing.T) {
 	})
 
 	t.Run("libxslt-no-iconv", func(t *testing.T) {
-		c := &conanInstaller{
-			config: map[string]string{},
-		}
 		pkg := upstream.Package{
 			Name:    "libxslt",
 			Version: "1.1.42",
 		}
-		ver, err := c.Dependency(pkg)
-		if err != nil {
-			t.Error(err)
-			return
-		}
-		sort.Sort(packageSort(ver))
-		t.Log(ver)
 		expectedDeps := []upstream.Package{
 			{"libiconv", "1.17"},
 			{"zlib", "1.3.1"},
 			{"libxml2", "2.13.6"},
 		}
-		if !reflect.DeepEqual(ver, expectedDeps) {
-			t.Errorf("unexpected dependency for libxml2: want %v got %v", expectedDeps, ver)
-		}
+		testDependency(t, map[string]string{}, pkg, expectedDeps)
 	})
 }
 
