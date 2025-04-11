@@ -4,11 +4,14 @@ package actions
 import (
 	"context"
 	"fmt"
+	"io"
+	"mime"
 	"net/http"
 	"os"
 	"path/filepath"
 	"regexp"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/google/go-github/v69/github"
@@ -347,31 +350,70 @@ func (d *DefaultClient) createReleaseByTag(tag string) *github.RepositoryRelease
 	return release
 }
 
-func (d *DefaultClient) getReleaseByTag(tag string) *github.RepositoryRelease {
+func (d *DefaultClient) uploadToRelease(fileName string, size int64, reader io.Reader, release *github.RepositoryRelease) {
 	ctx, cancel := context.WithTimeout(context.TODO(), 30*time.Second)
 	defer cancel()
 
-	release, _, err := d.client.Repositories.GetReleaseByTag(ctx, d.owner, d.repo, tag)
+	url := fmt.Sprintf("repos/%s/%s/releases/%d/assets?name=%s", d.owner, d.repo, release.GetID(), fileName)
+
+	req, err := d.client.NewUploadRequest(url, reader, size, "application/zip")
 	must(err)
-	// ok we get the relase entry
-	return release
+
+	asset := new(github.ReleaseAsset)
+	_, err = d.client.Do(ctx, req, asset)
+	must(err)
 }
 
-func (d *DefaultClient) uploadFileToRelease(fileName string, release *github.RepositoryRelease) error {
+func (d *DefaultClient) uploadArtifact(wg *sync.WaitGroup, artifactID int64, release *github.RepositoryRelease) {
+	ctx, cancel := context.WithTimeout(context.TODO(), 30*time.Second)
+	defer wg.Done()
+	defer cancel()
+
+	url, _, err := d.client.Actions.DownloadArtifact(ctx, d.owner, d.repo,
+		artifactID, 0)
+
+	must(err)
+
+	httpClient := &http.Client{Timeout: 30 * time.Second}
+
+	resp, err := httpClient.Get(url.String())
+	must(err)
+	defer resp.Body.Close()
+
+	disposition := resp.Header.Get("Content-Disposition")
+	_, params, err := mime.ParseMediaType(disposition)
+	must(err)
+
+	fileName, ok := params["filename"]
+	if !ok {
+		panic("no filename found in Content-Disposition")
+	}
+
+	fmt.Printf("Upload %s to %s\n", fileName, release.GetName())
+
+	d.uploadToRelease(fileName, resp.ContentLength, resp.Body, release)
+}
+
+func (d *DefaultClient) uploadArtifactsToRelease(release *github.RepositoryRelease) (files []*os.File) {
 	ctx, cancel := context.WithTimeout(context.TODO(), 30*time.Second)
 	defer cancel()
 
-	fs, err := os.Open(fileName)
+	artifacts, _, err := d.client.Actions.ListWorkflowRunArtifacts(ctx, d.owner, d.repo,
+		WorkflowID(), &github.ListOptions{})
+
 	must(err)
-	defer fs.Close()
 
-	_, _, err = d.client.Repositories.UploadReleaseAsset(
-		ctx, d.owner, d.repo, release.GetID(),
-		&github.UploadOptions{
-			Name: filepath.Base(fs.Name()),
-		}, fs)
+	if artifacts.GetTotalCount() == 0 {
+		panic("no artifact found")
+	}
 
-	return err
+	var wg sync.WaitGroup
+	wg.Add(len(artifacts.Artifacts))
+	for _, artifact := range artifacts.Artifacts {
+		go d.uploadArtifact(&wg, artifact.GetID(), release)
+	}
+	wg.Wait()
+	return
 }
 
 // removeBranch deletes a branch from the repository
@@ -501,7 +543,9 @@ func (d *DefaultClient) Postprocessing() {
 	}
 
 	// create a release
-	d.createReleaseByTag(version)
+	release := d.createReleaseByTag(version)
+
+	d.uploadArtifactsToRelease(release)
 
 	// we have finished tagging the commit, safe to remove the branch
 	if branchName, isLegacy := d.isLegacyVersion(); isLegacy {
@@ -548,16 +592,17 @@ func (d *DefaultClient) Release() {
 	file.RemovePattern(filepath.Join(tempDir, "*.pc"))
 	file.RemovePattern(filepath.Join(tempDir, "*.sh"))
 
-	zipFilePath, _ := filepath.Abs(binaryZip(uc.Pkg.Name))
+	zipFilename := binaryZip(uc.Pkg.Name)
+	zipFilePath, _ := filepath.Abs(zipFilename)
 
 	err = file.Zip(tempDir, zipFilePath)
 	must(err)
-	release := d.getReleaseByTag(version)
 
-	// upload file to release
-	err = d.uploadFileToRelease(zipFilePath, release)
-	must(err)
-
+	// upload to artifacts in GitHub Action
+	Setenv(map[string]string{
+		"BIN_PATH":     zipFilePath,
+		"BIN_FILENAME": strings.TrimSuffix(zipFilename, ".zip"),
+	})
 }
 
 // CreateBranchFromLabel creates release branch based on label format
