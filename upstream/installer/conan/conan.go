@@ -1,6 +1,7 @@
 package conan
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -30,6 +31,10 @@ const (
 	*:shared=True
 	%s`
 )
+
+func withShared(options []string) []string {
+	return append([]string{"*:shared=True"}, options...)
+}
 
 func retrievePCNames(cppInfo map[string]cppInfo) (pcNames []string) {
 	for name, info := range cppInfo {
@@ -179,8 +184,7 @@ func (c *conanInstaller) Config() map[string]string {
 
 // options combines Conan default options with user-specified options from configuration
 func (c *conanInstaller) options() []string {
-	arr := strings.Join([]string{`*:shared=True`, c.config["options"]}, " ")
-	return strings.Fields(arr)
+	return strings.Fields(c.config["options"])
 }
 
 // Install executes Conan installation for the specified package into the output directory.
@@ -199,7 +203,7 @@ func (c *conanInstaller) Install(pkg upstream.Package, outputDir string) ([]stri
 	builder.SetArg("output-folder", outputDir)
 	builder.SetArg("format", "json")
 
-	for _, opt := range c.options() {
+	for _, opt := range withShared(c.options()) {
 		builder.SetArg("options", opt)
 	}
 
@@ -271,9 +275,18 @@ func (c *conanInstaller) Dependency(pkg upstream.Package) (dependencies []upstre
 	builder.SetArg("requires", pkg.Name+"/"+pkg.Version)
 	builder.SetArg("format", "json")
 
+	for _, opt := range c.options() {
+		builder.SetArg("options", opt)
+	}
+
+	var conanError bytes.Buffer
+
 	cmd := builder.Cmd()
+	cmd.Stderr = &conanError
+
 	out, err := cmd.Output()
 	if err != nil {
+		err = errors.New(conanError.String())
 		return
 	}
 

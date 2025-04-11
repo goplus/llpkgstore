@@ -90,6 +90,11 @@ func TestConanIssue19(t *testing.T) {
 
 	t.Log(bp)
 
+	if !reflect.DeepEqual(bp, []string{"libxml-2.0"}) {
+		t.Errorf("unexpected pc files: %v", bp)
+		return
+	}
+
 	if err := verify(tempDir, bp); err != nil {
 		t.Errorf("Verify failed: %s", err)
 	}
@@ -126,20 +131,23 @@ func TestConanSearch(t *testing.T) {
 }
 
 func TestConanDependency(t *testing.T) {
-	c := &conanInstaller{
-		config: map[string]string{},
-	}
 	t.Run("fake", func(t *testing.T) {
+		c := &conanInstaller{
+			config: map[string]string{},
+		}
 		pkg := upstream.Package{
 			Name:    "faketest1145141919",
 			Version: "3.2.6",
 		}
 		_, err := c.Dependency(pkg)
 		if err == nil {
-			t.Error("unexpected package")
+			t.Errorf("unexpected behavior: no error")
 		}
 	})
 	t.Run("sdl", func(t *testing.T) {
+		c := &conanInstaller{
+			config: map[string]string{},
+		}
 		pkg := upstream.Package{
 			Name:    "sdl",
 			Version: "3.2.6",
@@ -168,7 +176,50 @@ func TestConanDependency(t *testing.T) {
 			{"libffi", "3.4.4"},
 		}
 		if !reflect.DeepEqual(ver, expectedDeps) {
-			t.Errorf("unexpected dependency for pcre: want %v got %v", expectedDeps, ver)
+			t.Errorf("unexpected dependency for sdl: want %v got %v", expectedDeps, ver)
+		}
+	})
+
+	t.Run("cjson", func(t *testing.T) {
+		c := &conanInstaller{
+			config: map[string]string{},
+		}
+		pkg := upstream.Package{
+			Name:    "cjson",
+			Version: "1.7.17",
+		}
+		ver, err := c.Dependency(pkg)
+		if err != nil {
+			t.Error(err)
+			return
+		}
+		if len(ver) > 0 {
+			t.Errorf("unexpected dependency for cjson: want %v got %v", []upstream.Package{}, ver)
+		}
+	})
+
+	t.Run("libxml2", func(t *testing.T) {
+		c := &conanInstaller{
+			config: map[string]string{
+				"options": `iconv=False`,
+			},
+		}
+		pkg := upstream.Package{
+			Name:    "libxml2",
+			Version: "2.9.9",
+		}
+		ver, err := c.Dependency(pkg)
+		if err != nil {
+			t.Error(err)
+			return
+		}
+		sort.Sort(packageSort(ver))
+
+		expectedDeps := []upstream.Package{
+			{"zlib", "1.3.1"},
+		}
+		if !reflect.DeepEqual(ver, expectedDeps) {
+			t.Errorf("unexpected dependency for libxml2: want %v got %v", expectedDeps, ver)
 		}
 	})
 }
