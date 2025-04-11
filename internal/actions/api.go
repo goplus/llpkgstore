@@ -16,6 +16,7 @@ import (
 
 	"github.com/google/go-github/v69/github"
 	"github.com/goplus/llpkgstore/config"
+	"github.com/goplus/llpkgstore/internal/actions/env"
 	"github.com/goplus/llpkgstore/internal/actions/mappedversion"
 	"github.com/goplus/llpkgstore/internal/actions/tag"
 	"github.com/goplus/llpkgstore/internal/actions/versions"
@@ -66,9 +67,9 @@ type DefaultClient struct {
 //	*DefaultClient: Configured client instance
 func NewDefaultClient() *DefaultClient {
 	dc := &DefaultClient{
-		client: github.NewClient(nil).WithAuthToken(Token()),
+		client: github.NewClient(nil).WithAuthToken(env.Token()),
 	}
-	dc.owner, dc.repo = Repository()
+	dc.owner, dc.repo = env.Repository()
 	return dc
 }
 
@@ -138,7 +139,7 @@ func (d *DefaultClient) isLegacyVersion() (branchName string, legacy bool) {
 	var refName string
 	if !ok {
 		// if this actions is not triggered by pull request, fallback to call API.
-		pulls := d.associatedWithPullRequest(LatestCommitSHA())
+		pulls := d.associatedWithPullRequest(env.LatestCommitSHA())
 		if len(pulls) == 0 {
 			panic("this commit is not associated with a pull request, this should not happen")
 		}
@@ -263,7 +264,7 @@ func (d *DefaultClient) commitMessage(sha string) *github.RepositoryCommit {
 //	If version format is invalid
 func (d *DefaultClient) mappedVersion() string {
 	// get message
-	message := d.commitMessage(LatestCommitSHA()).GetCommit().GetMessage()
+	message := d.commitMessage(env.LatestCommitSHA()).GetCommit().GetMessage()
 
 	// parse the mapped version
 	mappedVersion := regex(".*").FindString(message)
@@ -398,7 +399,7 @@ func (d *DefaultClient) uploadArtifactsToRelease(release *github.RepositoryRelea
 	defer cancel()
 
 	artifacts, _, err := d.client.Actions.ListWorkflowRunArtifacts(ctx, d.owner, d.repo,
-		WorkflowID(), &github.ListOptions{})
+		env.WorkflowID(), &github.ListOptions{})
 
 	must(err)
 
@@ -453,7 +454,7 @@ func (d *DefaultClient) checkVersion(ver *versions.Versions, cfg config.LLPkgCon
 func (d *DefaultClient) CheckPR() []string {
 	// build a file path map
 	pathMap := map[string][]string{}
-	for _, path := range Changes() {
+	for _, path := range env.Changes() {
 		dir := filepath.Dir(path)
 		// initialize the dir
 		pathMap[dir] = nil
@@ -509,7 +510,7 @@ func (d *DefaultClient) CheckPR() []string {
 // Creates Git tags, updates version records, and cleans up legacy branches
 func (d *DefaultClient) Postprocessing() {
 	// https://docs.github.com/en/actions/writing-workflows/choosing-when-your-workflow-runs/events-that-trigger-workflows#push
-	sha := LatestCommitSHA()
+	sha := env.LatestCommitSHA()
 	// check it's associated with a pr
 	if !d.isAssociatedWithPullRequest(sha) {
 		// not a merge commit, skip it.
@@ -599,7 +600,7 @@ func (d *DefaultClient) Release() {
 	must(err)
 
 	// upload to artifacts in GitHub Action
-	Setenv(Env{
+	env.Setenv(env.Env{
 		"BIN_PATH":     zipFilePath,
 		"BIN_FILENAME": strings.TrimSuffix(zipFilename, ".zip"),
 	})

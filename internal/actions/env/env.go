@@ -1,4 +1,4 @@
-package actions
+package env
 
 import (
 	"fmt"
@@ -7,6 +7,13 @@ import (
 	"strconv"
 	"strings"
 )
+
+// must panics if the error is non-nil, halting execution
+func must(err error) {
+	if err != nil {
+		panic(err)
+	}
+}
 
 type Env map[string]string
 

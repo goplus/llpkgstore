@@ -9,6 +9,7 @@ import (
 
 	"github.com/goplus/llpkgstore/config"
 	"github.com/goplus/llpkgstore/internal/actions"
+	"github.com/goplus/llpkgstore/internal/actions/env"
 	"github.com/goplus/llpkgstore/internal/actions/generator/llcppg"
 	"github.com/spf13/cobra"
 )
@@ -61,7 +62,7 @@ func runLLCppgVerification(_ *cobra.Command, _ []string) {
 	}
 	// output parsed path to Github Env for demotest
 	b, _ := json.Marshal(&paths)
-	actions.Setenv(actions.Env{
+	env.Setenv(env.Env{
 		"LLPKG_PATH": string(b),
 	})
 }
