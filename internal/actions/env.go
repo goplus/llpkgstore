@@ -3,6 +3,7 @@ package actions
 import (
 	"fmt"
 	"os"
+	"sort"
 	"strconv"
 	"strings"
 )
@@ -16,6 +17,8 @@ func (e Env) String() string {
 	for name, value := range e {
 		env = append(env, fmt.Sprintf("%s=%s", name, value))
 	}
+
+	sort.Strings(env)
 	return strings.Join(env, "\n")
 }
 
