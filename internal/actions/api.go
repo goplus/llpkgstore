@@ -5,9 +5,9 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"mime"
 	"net/http"
 	"os"
-	"path"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -350,22 +350,23 @@ func (d *DefaultClient) createReleaseByTag(tag string) *github.RepositoryRelease
 	return release
 }
 
-func (d *DefaultClient) uploadFileToRelease(wg *sync.WaitGroup, fs *os.File, release *github.RepositoryRelease) {
+func (d *DefaultClient) uploadToRelease(fileName string, size int64, reader io.Reader, release *github.RepositoryRelease) {
 	ctx, cancel := context.WithTimeout(context.TODO(), 30*time.Second)
-	defer wg.Done()
 	defer cancel()
-	defer fs.Close()
 
-	_, _, err := d.client.Repositories.UploadReleaseAsset(
-		ctx, d.owner, d.repo, release.GetID(),
-		&github.UploadOptions{
-			Name: filepath.Base(fs.Name()),
-		}, fs)
+	url := fmt.Sprintf("repos/%s/%s/releases/%d/assets?name=%s", d.owner, d.repo, release.GetID(), fileName)
+
+	req, err := d.client.NewUploadRequest(url, reader, size, "application/zip")
+	must(err)
+
+	asset := new(github.ReleaseAsset)
+	_, err = d.client.Do(ctx, req, asset)
 	must(err)
 }
 
-func (d *DefaultClient) downloadArtifactTo(fileCh chan *os.File, dir string, artifactID int64) {
+func (d *DefaultClient) uploadArtifact(wg *sync.WaitGroup, artifactID int64, release *github.RepositoryRelease) {
 	ctx, cancel := context.WithTimeout(context.TODO(), 30*time.Second)
+	defer wg.Done()
 	defer cancel()
 
 	url, _, err := d.client.Actions.DownloadArtifact(ctx, d.owner, d.repo,
@@ -375,24 +376,25 @@ func (d *DefaultClient) downloadArtifactTo(fileCh chan *os.File, dir string, art
 
 	httpClient := &http.Client{Timeout: 30 * time.Second}
 
-	resp, err := httpClient.Get(url.Path)
+	resp, err := httpClient.Get(url.String())
 	must(err)
 	defer resp.Body.Close()
 
-	filePath := filepath.Join(dir, path.Base(url.Path))
-
-	localFile, err := os.Create(filePath)
+	disposition := resp.Header.Get("Content-Disposition")
+	_, params, err := mime.ParseMediaType(disposition)
 	must(err)
 
-	fmt.Printf("Download %s to %s\n", url.Path, filePath)
+	fileName, ok := params["filename"]
+	if !ok {
+		panic("no filename found in Content-Disposition")
+	}
 
-	_, err = io.Copy(localFile, resp.Request.Body)
-	must(err)
+	fmt.Printf("Upload %s to %s\n", fileName, release.GetName())
 
-	fileCh <- localFile
+	d.uploadToRelease(fileName, resp.ContentLength, resp.Body, release)
 }
 
-func (d *DefaultClient) downloadArtifacts() (files []*os.File) {
+func (d *DefaultClient) uploadArtifactsToRelease(release *github.RepositoryRelease) (files []*os.File) {
 	ctx, cancel := context.WithTimeout(context.TODO(), 30*time.Second)
 	defer cancel()
 
@@ -405,20 +407,12 @@ func (d *DefaultClient) downloadArtifacts() (files []*os.File) {
 		panic("no artifact found")
 	}
 
-	tempDir, err := os.MkdirTemp("", "artfacts")
-	must(err)
-
-	fileCh := make(chan *os.File, len(artifacts.Artifacts))
-
+	var wg sync.WaitGroup
+	wg.Add(len(artifacts.Artifacts))
 	for _, artifact := range artifacts.Artifacts {
-		go d.downloadArtifactTo(fileCh, tempDir, artifact.GetID())
+		go d.uploadArtifact(&wg, artifact.GetID(), release)
 	}
-
-	for range artifacts.Artifacts {
-		file := <-fileCh
-
-		files = append(files, file)
-	}
+	wg.Wait()
 	return
 }
 
@@ -551,16 +545,7 @@ func (d *DefaultClient) Postprocessing() {
 	// create a release
 	release := d.createReleaseByTag(version)
 
-	files := d.downloadArtifacts()
-
-	var wg sync.WaitGroup
-	wg.Add(len(files))
-
-	for _, file := range files {
-		go d.uploadFileToRelease(&wg, file, release)
-	}
-
-	wg.Wait()
+	d.uploadArtifactsToRelease(release)
 
 	// we have finished tagging the commit, safe to remove the branch
 	if branchName, isLegacy := d.isLegacyVersion(); isLegacy {
@@ -607,14 +592,16 @@ func (d *DefaultClient) Release() {
 	file.RemovePattern(filepath.Join(tempDir, "*.pc"))
 	file.RemovePattern(filepath.Join(tempDir, "*.sh"))
 
-	zipFilePath, _ := filepath.Abs(binaryZip(uc.Pkg.Name))
+	zipFilename := binaryZip(uc.Pkg.Name)
+	zipFilePath, _ := filepath.Abs(zipFilename)
 
 	err = file.Zip(tempDir, zipFilePath)
 	must(err)
 
 	// upload to artifacts in GitHub Action
 	Setenv(map[string]string{
-		"BIN_PATH": zipFilePath,
+		"BIN_PATH":     zipFilePath,
+		"BIN_FILENAME": strings.TrimSuffix(zipFilename, ".zip"),
 	})
 }
 
