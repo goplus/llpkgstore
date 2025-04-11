@@ -599,7 +599,7 @@ func (d *DefaultClient) Release() {
 	must(err)
 
 	// upload to artifacts in GitHub Action
-	Setenv(map[string]string{
+	Setenv(Env{
 		"BIN_PATH":     zipFilePath,
 		"BIN_FILENAME": strings.TrimSuffix(zipFilename, ".zip"),
 	})

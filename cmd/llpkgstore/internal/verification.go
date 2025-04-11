@@ -61,7 +61,7 @@ func runLLCppgVerification(_ *cobra.Command, _ []string) {
 	}
 	// output parsed path to Github Env for demotest
 	b, _ := json.Marshal(&paths)
-	actions.Setenv(map[string]string{
+	actions.Setenv(actions.Env{
 		"LLPKG_PATH": string(b),
 	})
 }
