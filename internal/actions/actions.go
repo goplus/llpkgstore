@@ -18,18 +18,24 @@ import (
 	"golang.org/x/mod/semver"
 )
 
-// GitHubEvent caches parsed GitHub event data from GITHUB_EVENT_PATH
-var GitHubEvent = sync.OnceValue(parseGitHubEvent)
+var (
+	// GitHubEvent caches parsed GitHub event data from GITHUB_EVENT_PATH
+	GitHubEvent = sync.OnceValue(parseGitHubEvent)
 
-// In our previous design, each platform should generate *_{OS}_{Arch}.go file
-// Feb 12th, this design revoked, still keep the code.
-var currentSuffix = runtime.GOOS + "_" + runtime.GOARCH
+	// In our previous design, each platform should generate *_{OS}_{Arch}.go file
+	// Feb 12th, this design revoked, still keep the code.
+	_currentSuffix = runtime.GOOS + "_" + runtime.GOARCH
+)
 
 // must panics if the error is non-nil, halting execution
 func must(err error) {
 	if err != nil {
 		panic(err)
 	}
+}
+
+func binaryZip(packageName string) string {
+	return fmt.Sprintf("%s_%s.zip", packageName, _currentSuffix)
 }
 
 // envToString converts environment variables map to newline-separated key=value pairs for GitHub Actions

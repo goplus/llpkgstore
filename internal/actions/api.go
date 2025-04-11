@@ -28,8 +28,8 @@ const (
 	BranchPrefix        = "release-branch."
 	MappedVersionPrefix = "Release-as: "
 
-	defaultReleaseBranch = "main"
-	regexString          = `Release-as:\s%s/v(?P<major>0|[1-9]\d*)\.(?P<minor>0|[1-9]\d*)\.(?P<patch>0|[1-9]\d*)(?:-(?P<prerelease>(?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*)(?:\.(?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*))*))?(?:\+(?P<buildmetadata>[0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?`
+	_defaultReleaseBranch = "main"
+	_regexString          = `Release-as:\s%s/v(?P<major>0|[1-9]\d*)\.(?P<minor>0|[1-9]\d*)\.(?P<patch>0|[1-9]\d*)(?:-(?P<prerelease>(?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*)(?:\.(?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*))*))?(?:\+(?P<buildmetadata>[0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?`
 )
 
 // regex compiles a regular expression pattern to detect "Release-as" directives in commit messages
@@ -43,11 +43,7 @@ const (
 func regex(packageName string) *regexp.Regexp {
 	// format: Release-as: clib/semver(with v prefix)
 	// Must have one space in the end of Release-as:
-	return regexp.MustCompile(fmt.Sprintf(regexString, packageName))
-}
-
-func binaryZip(packageName string) string {
-	return fmt.Sprintf("%s_%s.zip", packageName, currentSuffix)
+	return regexp.MustCompile(fmt.Sprintf(_regexString, packageName))
 }
 
 // DefaultClient provides GitHub API client capabilities with authentication for Actions workflows
@@ -333,7 +329,7 @@ func (d *DefaultClient) createReleaseByTag(tag string) *github.RepositoryRelease
 	ctx, cancel := context.WithTimeout(context.TODO(), 30*time.Second)
 	defer cancel()
 
-	branch := defaultReleaseBranch
+	branch := _defaultReleaseBranch
 
 	makeLatest := "true"
 	if _, isLegacy := d.isLegacyVersion(); isLegacy {
