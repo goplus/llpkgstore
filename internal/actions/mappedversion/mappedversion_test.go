@@ -16,6 +16,13 @@ func TestMappedVersion(t *testing.T) {
 		}
 	})
 
+	t.Run("invalid-3", func(t *testing.T) {
+		_, _, err := From("cjson/1.7.18").Parse()
+		if err == nil {
+			t.Errorf("unpexted behavior: no error")
+		}
+	})
+
 	t.Run("valid", func(t *testing.T) {
 		clib, version, err := From("cjson/v1.0.0").Parse()
 		if err != nil {
