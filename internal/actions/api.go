@@ -4,15 +4,21 @@ package actions
 import (
 	"context"
 	"fmt"
+	"io"
+	"mime"
 	"net/http"
 	"os"
 	"path/filepath"
 	"regexp"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/google/go-github/v69/github"
 	"github.com/goplus/llpkgstore/config"
+	"github.com/goplus/llpkgstore/internal/actions/env"
+	"github.com/goplus/llpkgstore/internal/actions/mappedversion"
+	"github.com/goplus/llpkgstore/internal/actions/tag"
 	"github.com/goplus/llpkgstore/internal/actions/versions"
 	"github.com/goplus/llpkgstore/internal/file"
 	"github.com/goplus/llpkgstore/internal/pc"
@@ -23,8 +29,8 @@ const (
 	BranchPrefix        = "release-branch."
 	MappedVersionPrefix = "Release-as: "
 
-	defaultReleaseBranch = "main"
-	regexString          = `Release-as:\s%s/v(?P<major>0|[1-9]\d*)\.(?P<minor>0|[1-9]\d*)\.(?P<patch>0|[1-9]\d*)(?:-(?P<prerelease>(?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*)(?:\.(?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*))*))?(?:\+(?P<buildmetadata>[0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?`
+	_defaultReleaseBranch = "main"
+	_regexString          = `Release-as:\s%s/v(?P<major>0|[1-9]\d*)\.(?P<minor>0|[1-9]\d*)\.(?P<patch>0|[1-9]\d*)(?:-(?P<prerelease>(?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*)(?:\.(?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*))*))?(?:\+(?P<buildmetadata>[0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?`
 )
 
 // regex compiles a regular expression pattern to detect "Release-as" directives in commit messages
@@ -38,11 +44,7 @@ const (
 func regex(packageName string) *regexp.Regexp {
 	// format: Release-as: clib/semver(with v prefix)
 	// Must have one space in the end of Release-as:
-	return regexp.MustCompile(fmt.Sprintf(regexString, packageName))
-}
-
-func binaryZip(packageName string) string {
-	return fmt.Sprintf("%s_%s.zip", packageName, currentSuffix)
+	return regexp.MustCompile(fmt.Sprintf(_regexString, packageName))
 }
 
 // DefaultClient provides GitHub API client capabilities with authentication for Actions workflows
@@ -65,9 +67,9 @@ type DefaultClient struct {
 //	*DefaultClient: Configured client instance
 func NewDefaultClient() *DefaultClient {
 	dc := &DefaultClient{
-		client: github.NewClient(nil).WithAuthToken(Token()),
+		client: github.NewClient(nil).WithAuthToken(env.Token()),
 	}
-	dc.owner, dc.repo = Repository()
+	dc.owner, dc.repo = env.Repository()
 	return dc
 }
 
@@ -137,7 +139,7 @@ func (d *DefaultClient) isLegacyVersion() (branchName string, legacy bool) {
 	var refName string
 	if !ok {
 		// if this actions is not triggered by pull request, fallback to call API.
-		pulls := d.associatedWithPullRequest(LatestCommitSHA())
+		pulls := d.associatedWithPullRequest(env.LatestCommitSHA())
 		if len(pulls) == 0 {
 			panic("this commit is not associated with a pull request, this should not happen")
 		}
@@ -214,22 +216,25 @@ func (d *DefaultClient) removeLabel(labelName string) {
 // Panics:
 //
 //	If no valid version found in PR commits
-func (d *DefaultClient) checkMappedVersion(packageName string) (mappedVersion string) {
+func (d *DefaultClient) checkMappedVersion(packageName string) mappedversion.MappedVersion {
 	matchMappedVersion := regex(packageName)
+
+	var rawMappedVersion string
 
 	for _, commit := range d.currentPRCommit() {
 		message := commit.GetCommit().GetMessage()
-		if mappedVersion = matchMappedVersion.FindString(message); mappedVersion != "" {
+		if rawMappedVersion = matchMappedVersion.FindString(message); rawMappedVersion != "" {
 			// remove space, of course
-			mappedVersion = strings.TrimSpace(mappedVersion)
+			rawMappedVersion = strings.TrimSpace(rawMappedVersion)
 			break
 		}
 	}
 
-	if mappedVersion == "" {
+	if rawMappedVersion == "" {
 		panic("no MappedVersion found in the PR")
 	}
-	return
+
+	return mappedversion.From(rawMappedVersion)
 }
 
 // commitMessage retrieves commit details by SHA
@@ -259,7 +264,7 @@ func (d *DefaultClient) commitMessage(sha string) *github.RepositoryCommit {
 //	If version format is invalid
 func (d *DefaultClient) mappedVersion() string {
 	// get message
-	message := d.commitMessage(LatestCommitSHA()).GetCommit().GetMessage()
+	message := d.commitMessage(env.LatestCommitSHA()).GetCommit().GetMessage()
 
 	// parse the mapped version
 	mappedVersion := regex(".*").FindString(message)
@@ -267,10 +272,8 @@ func (d *DefaultClient) mappedVersion() string {
 	if mappedVersion == "" {
 		return ""
 	}
-	version := strings.TrimPrefix(mappedVersion, MappedVersionPrefix)
-	if version == mappedVersion {
-		panic("invalid format")
-	}
+	version := mustTrimPrefix(mappedVersion, MappedVersionPrefix)
+
 	return strings.TrimSpace(version)
 }
 
@@ -283,12 +286,12 @@ func (d *DefaultClient) mappedVersion() string {
 // Returns:
 //
 //	error: Error during tag creation
-func (d *DefaultClient) createTag(tag, sha string) error {
+func (d *DefaultClient) createTag(versionTag tag.Tag, sha string) error {
 	ctx, cancel := context.WithTimeout(context.TODO(), 30*time.Second)
 	defer cancel()
 
 	// tag the commit
-	tagRefName := tagRef(tag)
+	tagRefName := versionTag.Ref()
 	_, _, err := d.client.Git.CreateRef(ctx, d.owner, d.repo, &github.Reference{
 		Ref: &tagRefName,
 		Object: &github.GitObject{
@@ -327,7 +330,7 @@ func (d *DefaultClient) createReleaseByTag(tag string) *github.RepositoryRelease
 	ctx, cancel := context.WithTimeout(context.TODO(), 30*time.Second)
 	defer cancel()
 
-	branch := defaultReleaseBranch
+	branch := _defaultReleaseBranch
 
 	makeLatest := "true"
 	if _, isLegacy := d.isLegacyVersion(); isLegacy {
@@ -347,31 +350,70 @@ func (d *DefaultClient) createReleaseByTag(tag string) *github.RepositoryRelease
 	return release
 }
 
-func (d *DefaultClient) getReleaseByTag(tag string) *github.RepositoryRelease {
+func (d *DefaultClient) uploadToRelease(fileName string, size int64, reader io.Reader, release *github.RepositoryRelease) {
 	ctx, cancel := context.WithTimeout(context.TODO(), 30*time.Second)
 	defer cancel()
 
-	release, _, err := d.client.Repositories.GetReleaseByTag(ctx, d.owner, d.repo, tag)
+	url := fmt.Sprintf("repos/%s/%s/releases/%d/assets?name=%s", d.owner, d.repo, release.GetID(), fileName)
+
+	req, err := d.client.NewUploadRequest(url, reader, size, "application/zip")
 	must(err)
-	// ok we get the relase entry
-	return release
+
+	asset := new(github.ReleaseAsset)
+	_, err = d.client.Do(ctx, req, asset)
+	must(err)
 }
 
-func (d *DefaultClient) uploadFileToRelease(fileName string, release *github.RepositoryRelease) error {
+func (d *DefaultClient) uploadArtifact(wg *sync.WaitGroup, artifactID int64, release *github.RepositoryRelease) {
+	ctx, cancel := context.WithTimeout(context.TODO(), 30*time.Second)
+	defer wg.Done()
+	defer cancel()
+
+	url, _, err := d.client.Actions.DownloadArtifact(ctx, d.owner, d.repo,
+		artifactID, 0)
+
+	must(err)
+
+	httpClient := &http.Client{Timeout: 30 * time.Second}
+
+	resp, err := httpClient.Get(url.String())
+	must(err)
+	defer resp.Body.Close()
+
+	disposition := resp.Header.Get("Content-Disposition")
+	_, params, err := mime.ParseMediaType(disposition)
+	must(err)
+
+	fileName, ok := params["filename"]
+	if !ok {
+		panic("no filename found in Content-Disposition")
+	}
+
+	fmt.Printf("Upload %s to %s\n", fileName, release.GetName())
+
+	d.uploadToRelease(fileName, resp.ContentLength, resp.Body, release)
+}
+
+func (d *DefaultClient) uploadArtifactsToRelease(release *github.RepositoryRelease) (files []*os.File) {
 	ctx, cancel := context.WithTimeout(context.TODO(), 30*time.Second)
 	defer cancel()
 
-	fs, err := os.Open(fileName)
+	artifacts, _, err := d.client.Actions.ListWorkflowRunArtifacts(ctx, d.owner, d.repo,
+		env.WorkflowID(), &github.ListOptions{})
+
 	must(err)
-	defer fs.Close()
 
-	_, _, err = d.client.Repositories.UploadReleaseAsset(
-		ctx, d.owner, d.repo, release.GetID(),
-		&github.UploadOptions{
-			Name: filepath.Base(fs.Name()),
-		}, fs)
+	if artifacts.GetTotalCount() == 0 {
+		panic("no artifact found")
+	}
 
-	return err
+	var wg sync.WaitGroup
+	wg.Add(len(artifacts.Artifacts))
+	for _, artifact := range artifacts.Artifacts {
+		go d.uploadArtifact(&wg, artifact.GetID(), release)
+	}
+	wg.Wait()
+	return
 }
 
 // removeBranch deletes a branch from the repository
@@ -399,8 +441,7 @@ func (d *DefaultClient) removeBranch(branchName string) error {
 func (d *DefaultClient) checkVersion(ver *versions.Versions, cfg config.LLPkgConfig) {
 	// 4. Check MappedVersion
 	version := d.checkMappedVersion(cfg.Upstream.Package.Name)
-	_, mappedVersion := parseMappedVersion(version)
-
+	_, mappedVersion := version.MustParse()
 	// 5. Check version is valid
 	_, isLegacy := d.isLegacyVersion()
 	checkLegacyVersion(ver, cfg, mappedVersion, isLegacy)
@@ -413,7 +454,7 @@ func (d *DefaultClient) checkVersion(ver *versions.Versions, cfg config.LLPkgCon
 func (d *DefaultClient) CheckPR() []string {
 	// build a file path map
 	pathMap := map[string][]string{}
-	for _, path := range Changes() {
+	for _, path := range env.Changes() {
 		dir := filepath.Dir(path)
 		// initialize the dir
 		pathMap[dir] = nil
@@ -469,7 +510,7 @@ func (d *DefaultClient) CheckPR() []string {
 // Creates Git tags, updates version records, and cleans up legacy branches
 func (d *DefaultClient) Postprocessing() {
 	// https://docs.github.com/en/actions/writing-workflows/choosing-when-your-workflow-runs/events-that-trigger-workflows#push
-	sha := LatestCommitSHA()
+	sha := env.LatestCommitSHA()
 	// check it's associated with a pr
 	if !d.isAssociatedWithPullRequest(sha) {
 		// not a merge commit, skip it.
@@ -482,7 +523,7 @@ func (d *DefaultClient) Postprocessing() {
 		panic("no mapped version found in the commit message")
 	}
 
-	clib, mappedVersion := parseMappedVersion(version)
+	clib, mappedVersion := mappedversion.From(version).MustParse()
 
 	// the pr has merged, so we can read it.
 	cfg, err := config.ParseLLPkgConfig(filepath.Join(clib, "llpkg.cfg"))
@@ -492,16 +533,20 @@ func (d *DefaultClient) Postprocessing() {
 	ver := versions.Read("llpkgstore.json")
 	ver.Write(clib, cfg.Upstream.Package.Version, mappedVersion)
 
-	if hasTag(version) {
+	versionTag := tag.From(version)
+
+	if versionTag.Exist() {
 		panic("tag has already existed")
 	}
 
-	if err := d.createTag(version, sha); err != nil {
+	if err := d.createTag(versionTag, sha); err != nil {
 		panic(err)
 	}
 
 	// create a release
-	d.createReleaseByTag(version)
+	release := d.createReleaseByTag(version)
+
+	d.uploadArtifactsToRelease(release)
 
 	// we have finished tagging the commit, safe to remove the branch
 	if branchName, isLegacy := d.isLegacyVersion(); isLegacy {
@@ -517,7 +562,7 @@ func (d *DefaultClient) Release() {
 		panic("no mapped version found in the commit message")
 	}
 
-	clib, _ := parseMappedVersion(version)
+	clib, _ := mappedversion.From(version).MustParse()
 	// the pr has merged, so we can read it.
 	cfg, err := config.ParseLLPkgConfig(filepath.Join(clib, "llpkg.cfg"))
 	must(err)
@@ -548,36 +593,32 @@ func (d *DefaultClient) Release() {
 	file.RemovePattern(filepath.Join(tempDir, "*.pc"))
 	file.RemovePattern(filepath.Join(tempDir, "*.sh"))
 
-	zipFilePath, _ := filepath.Abs(binaryZip(uc.Pkg.Name))
+	zipFilename := binaryZip(uc.Pkg.Name)
+	zipFilePath, _ := filepath.Abs(zipFilename)
 
 	err = file.Zip(tempDir, zipFilePath)
 	must(err)
-	release := d.getReleaseByTag(version)
 
-	// upload file to release
-	err = d.uploadFileToRelease(zipFilePath, release)
-	must(err)
-
+	// upload to artifacts in GitHub Action
+	env.Setenv(env.Env{
+		"BIN_PATH":     zipFilePath,
+		"BIN_FILENAME": strings.TrimSuffix(zipFilename, ".zip"),
+	})
 }
 
 // CreateBranchFromLabel creates release branch based on label format
 // Follows naming convention: release-branch.<CLibraryName>/<MappedVersion>
 func (d *DefaultClient) CreateBranchFromLabel(labelName string) {
 	// design: branch:release-branch.{CLibraryName}/{MappedVersion}
-	branchName := strings.TrimPrefix(strings.TrimSpace(labelName), LabelPrefix)
-	if branchName == labelName {
-		panic("invalid label name format")
-	}
+	branchName := mustTrimPrefix(strings.TrimSpace(labelName), LabelPrefix)
 
 	// fast-path: branch exists, can skip.
 	if d.hasBranch(branchName) {
 		return
 	}
-	version := strings.TrimPrefix(branchName, BranchPrefix)
-	if version == branchName {
-		panic("invalid label name format")
-	}
-	clib, _ := parseMappedVersion(version)
+	version := mustTrimPrefix(branchName, BranchPrefix)
+
+	clib, _ := mappedversion.From(version).MustParse()
 	// slow-path: check the condition if we can create a branch
 	//
 	// create a branch only when this version is legacy.
@@ -595,7 +636,7 @@ func (d *DefaultClient) CreateBranchFromLabel(labelName string) {
 		panic("c version dones't follow semver, skip maintaining.")
 	}
 
-	err := d.createBranch(branchName, shaFromTag(version))
+	err := d.createBranch(branchName, tag.From(version).SHA())
 	must(err)
 }
 

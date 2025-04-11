@@ -2,29 +2,12 @@ package actions
 
 import (
 	"os"
-	"os/exec"
 	"strings"
 	"testing"
 
 	"github.com/goplus/llpkgstore/config"
 	"github.com/goplus/llpkgstore/internal/actions/versions"
 )
-
-func TestHasTag(t *testing.T) {
-	if hasTag("aaaaaaaaaaa1.1.4.5.1.4.1.9.1.9") {
-		t.Error("unexpected tag")
-	}
-	exec.Command("git", "tag", "aaaaaaaaaaa1.1.4.5.1.4.1.9.1.9").Run()
-	if !hasTag("aaaaaaaaaaa1.1.4.5.1.4.1.9.1.9") {
-		t.Error("tag doesn't exist")
-	}
-	ret, _ := exec.Command("git", "tag").CombinedOutput()
-	t.Log(string(ret))
-	exec.Command("git", "tag", "-d", "aaaaaaaaaaa1.1.4.5.1.4.1.9.1.9").Run()
-	if hasTag("aaaaaaaaaaa1.1.4.5.1.4.1.9.1.9") {
-		t.Error("unexpected tag")
-	}
-}
 
 func recoverFn(branchName string, fn func(legacy bool)) (ret any) {
 	defer func() {
