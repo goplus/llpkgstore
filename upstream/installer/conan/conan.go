@@ -36,7 +36,7 @@ func withShared(options []string) []string {
 	return append([]string{"*:shared=True"}, options...)
 }
 
-func retrievePCNames(cppInfo map[string]cppInfo) (pcNames []string) {
+func retrievePC(cppInfo map[string]cppInfo) (pcNames []string) {
 	for name, info := range cppInfo {
 		// skip itself
 		if name == "root" {
@@ -123,20 +123,20 @@ func (c *conanInstaller) findBinaryPathFromPC(
 	pcName = append(pcName, pkg.Name)
 
 	for _, packageInfo := range m.Graph.Nodes {
-		if packageInfo.Name == pkg.Name {
-			// root must exist, this should not happen, returns an error.
-			root, ok := packageInfo.CppInfo["root"]
-			if !ok {
-				err = ErrPackageNotFound
-				return
-			}
-			if root.Properties.PkgName != "" {
-				// root is the real pkg config name, replace instead.
-				pcName[0] = root.Properties.PkgName
-			}
-			pcName = append(pcName, retrievePCNames(packageInfo.CppInfo)...)
-			break
+		if packageInfo.Name != pkg.Name {
+			continue
 		}
+		// root must exist, this should not happen, returns an error.
+		root, ok := packageInfo.CppInfo["root"]
+		if !ok {
+			err = ErrPackageNotFound
+			return
+		}
+		if root.Properties.PkgName != "" {
+			// root is the real pkg config name, replace instead.
+			pcName[0] = root.Properties.PkgName
+		}
+		pcName = append(pcName, retrievePC(packageInfo.CppInfo)...)
 	}
 
 	pcFile, err := os.ReadFile(filepath.Join(dir, pcName[0]+".pc"))
