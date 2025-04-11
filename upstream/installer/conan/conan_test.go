@@ -130,6 +130,22 @@ func TestConanSearch(t *testing.T) {
 
 }
 
+func testDependency(t *testing.T, config map[string]string, pkg upstream.Package, expectedDeps []upstream.Package) {
+	c := &conanInstaller{
+		config: config,
+	}
+	ver, err := c.Dependency(pkg)
+	if err != nil {
+		t.Error(err)
+		return
+	}
+	sort.Sort(packageSort(ver))
+
+	if !reflect.DeepEqual(ver, expectedDeps) {
+		t.Errorf("unexpected dependency for sdl: want %v got %v", expectedDeps, ver)
+	}
+}
+
 func TestConanDependency(t *testing.T) {
 	t.Run("fake", func(t *testing.T) {
 		c := &conanInstaller{
@@ -145,22 +161,10 @@ func TestConanDependency(t *testing.T) {
 		}
 	})
 	t.Run("sdl", func(t *testing.T) {
-		c := &conanInstaller{
-			config: map[string]string{},
-		}
 		pkg := upstream.Package{
 			Name:    "sdl",
 			Version: "3.2.6",
 		}
-		ver, err := c.Dependency(pkg)
-		if err != nil {
-			t.Error(err)
-			return
-		}
-		sort.Sort(packageSort(ver))
-
-		t.Log(ver)
-
 		expectedDeps := []upstream.Package{
 			{"libusb", "1.0.26"},
 			{"dbus", "1.15.8"},
@@ -175,78 +179,41 @@ func TestConanDependency(t *testing.T) {
 			{"expat", "2.7.1"},
 			{"libffi", "3.4.4"},
 		}
-		if !reflect.DeepEqual(ver, expectedDeps) {
-			t.Errorf("unexpected dependency for sdl: want %v got %v", expectedDeps, ver)
-		}
+		testDependency(t, map[string]string{}, pkg, expectedDeps)
 	})
 
 	t.Run("cjson", func(t *testing.T) {
-		c := &conanInstaller{
-			config: map[string]string{},
-		}
-		pkg := upstream.Package{
+		testDependency(t, map[string]string{}, upstream.Package{
 			Name:    "cjson",
 			Version: "1.7.17",
-		}
-		ver, err := c.Dependency(pkg)
-		if err != nil {
-			t.Error(err)
-			return
-		}
-		if len(ver) > 0 {
-			t.Errorf("unexpected dependency for cjson: want %v got %v", []upstream.Package{}, ver)
-		}
+		}, nil)
 	})
 
 	t.Run("libxml2", func(t *testing.T) {
-		c := &conanInstaller{
-			config: map[string]string{
-				"options": `iconv=False`,
-			},
-		}
 		pkg := upstream.Package{
 			Name:    "libxml2",
 			Version: "2.9.9",
 		}
-		ver, err := c.Dependency(pkg)
-		if err != nil {
-			t.Error(err)
-			return
-		}
-		sort.Sort(packageSort(ver))
-
 		expectedDeps := []upstream.Package{
 			{"zlib", "1.3.1"},
 		}
-		if !reflect.DeepEqual(ver, expectedDeps) {
-			t.Errorf("unexpected dependency for libxml2: want %v got %v", expectedDeps, ver)
-		}
+		testDependency(t, map[string]string{
+			"options": `iconv=False`,
+		}, pkg, expectedDeps)
 	})
 
 	t.Run("libxslt-with-iconv", func(t *testing.T) {
-		c := &conanInstaller{
-			config: map[string]string{
-				"options": `libxml2/*:iconv=False`,
-			},
-		}
 		pkg := upstream.Package{
 			Name:    "libxslt",
 			Version: "1.1.42",
 		}
-		ver, err := c.Dependency(pkg)
-		if err != nil {
-			t.Error(err)
-			return
-		}
-		sort.Sort(packageSort(ver))
-		t.Log(ver)
 		expectedDeps := []upstream.Package{
 			{"zlib", "1.3.1"},
 			{"libxml2", "2.13.6"},
 		}
-		if !reflect.DeepEqual(ver, expectedDeps) {
-			t.Errorf("unexpected dependency for libxml2: want %v got %v", expectedDeps, ver)
-		}
+		testDependency(t, map[string]string{
+			"options": `libxml2/*:iconv=False`,
+		}, pkg, expectedDeps)
 	})
 
 	t.Run("libxslt-no-iconv", func(t *testing.T) {
