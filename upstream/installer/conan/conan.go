@@ -50,7 +50,7 @@ func retrievePC(cppInfo map[string]cppInfo) (pcNames []string) {
 }
 
 func buildDependenciesMap(depsInfo dependencyInfo) map[string]string {
-	deps := map[string]string{}
+	deps := make(map[string]string)
 
 	// conan require info format: zlib/1.3.Z
 	// 1.3.Z means match the major and minor version with 1.3
