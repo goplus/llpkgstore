@@ -1,4 +1,3 @@
-// Package actions contains GitHub Actions helper functions for version management and repository operations.
 package actions
 
 import (
@@ -44,292 +43,6 @@ func NewDefaultClient() *DefaultClient {
 	}
 	dc.owner, dc.repo = env.Repository()
 	return dc
-}
-
-// hasBranch checks existence of a specific branch in the repository
-func (d *DefaultClient) hasBranch(branchName string) bool {
-	ctx, cancel := context.WithTimeout(context.TODO(), 30*time.Second)
-	defer cancel()
-
-	branch, resp, err := d.client.Repositories.GetBranch(
-		ctx, d.owner, d.repo, branchName, 0,
-	)
-
-	return err == nil && branch != nil &&
-		resp.StatusCode == http.StatusOK
-}
-
-// associatedWithPullRequest finds all pull requests containing the specified commit
-func (d *DefaultClient) associatedWithPullRequest(sha string) []*github.PullRequest {
-	ctx, cancel := context.WithTimeout(context.TODO(), 30*time.Second)
-	defer cancel()
-
-	pulls, _, err := d.client.PullRequests.ListPullRequestsWithCommit(
-		ctx, d.owner, d.repo, sha, &github.ListOptions{},
-	)
-	must(err)
-	return pulls
-}
-
-// isAssociatedWithPullRequest checks if commit belongs to a closed pull request
-func (d *DefaultClient) isAssociatedWithPullRequest(sha string) bool {
-	pulls := d.associatedWithPullRequest(sha)
-	// don't use GetMerge, because GetMerge may be a mistake.
-	// sometime, when a pull request is merged, GetMerge still returns false.
-	// so checking pull request state is more accurate.
-	return len(pulls) > 0 &&
-		pulls[0].GetState() == "closed"
-}
-
-// isLegacyVersion determines if PR targets a legacy branch
-func (d *DefaultClient) isLegacyVersion() (branchName string, legacy bool) {
-	pullRequest, ok := GitHubEvent()["pull_request"].(map[string]any)
-	if !ok {
-		// if this actions is not triggered by pull request, fallback to call API.
-		pulls := d.associatedWithPullRequest(env.LatestCommitSHA())
-		if len(pulls) == 0 {
-			panic("this commit is not associated with a pull request, this should not happen")
-		}
-		branchName = pulls[0].GetBase().GetRef()
-	} else {
-		// unnecessary to check type, because currentPRCommit has been checked.
-		base := pullRequest["base"].(map[string]any)
-		branchName = base["ref"].(string)
-	}
-
-	legacy = isLegacyBranch(branchName)
-	return
-}
-
-// currentPRCommit retrieves all commits in the current pull request
-func (d *DefaultClient) currentPRCommit() []*github.RepositoryCommit {
-	pullRequest := PullRequestEvent()
-	prNumber := int(pullRequest["number"].(float64))
-
-	ctx, cancel := context.WithTimeout(context.TODO(), 30*time.Second)
-	defer cancel()
-	// use authorized API to avoid Github RateLimit
-	commits, _, err := d.client.PullRequests.ListCommits(
-		ctx, d.owner, d.repo, prNumber,
-		&github.ListOptions{},
-	)
-	must(err)
-	return commits
-}
-
-// allCommits retrieves all repository commits
-func (d *DefaultClient) allCommits() []*github.RepositoryCommit {
-	ctx, cancel := context.WithTimeout(context.TODO(), 30*time.Second)
-	defer cancel()
-	// use authorized API to avoid Github RateLimit
-	commits, _, err := d.client.Repositories.ListCommits(
-		ctx, d.owner, d.repo,
-		&github.CommitsListOptions{},
-	)
-	must(err)
-	return commits
-}
-
-// removeLabel deletes a label from the repository
-func (d *DefaultClient) removeLabel(labelName string) {
-	ctx, cancel := context.WithTimeout(context.TODO(), 30*time.Second)
-	defer cancel()
-	// use authorized API to avoid Github RateLimit
-	_, err := d.client.Issues.DeleteLabel(
-		ctx, d.owner, d.repo, labelName,
-	)
-	must(err)
-}
-
-// checkMappedVersion validates PR contains valid "Release-as" version declaration
-func (d *DefaultClient) checkMappedVersion(packageName string) mappedversion.MappedVersion {
-	matchMappedVersion := regex(packageName)
-
-	var rawMappedVersion string
-
-	for _, commit := range d.currentPRCommit() {
-		message := commit.GetCommit().GetMessage()
-		if rawMappedVersion = matchMappedVersion.FindString(message); rawMappedVersion != "" {
-			// remove space, of course
-			rawMappedVersion = strings.TrimSpace(rawMappedVersion)
-			break
-		}
-	}
-
-	if rawMappedVersion == "" {
-		panic("no MappedVersion found in the PR")
-	}
-
-	return mappedversion.From(rawMappedVersion)
-}
-
-// commitMessage retrieves commit details by SHA
-func (d *DefaultClient) commitMessage(sha string) *github.RepositoryCommit {
-	ctx, cancel := context.WithTimeout(context.TODO(), 30*time.Second)
-	defer cancel()
-
-	commit, _, err := d.client.Repositories.GetCommit(ctx, d.owner, d.repo, sha, &github.ListOptions{})
-	must(err)
-	return commit
-}
-
-// mappedVersion parses the latest commit's mapped version from "Release-as" directive
-func (d *DefaultClient) mappedVersion() string {
-	// get message
-	message := d.commitMessage(env.LatestCommitSHA()).GetCommit().GetMessage()
-
-	// parse the mapped version
-	commitVersion := regex(".*").FindString(message)
-	// mapped version not found, a normal commit?
-	if commitVersion == "" {
-		return ""
-	}
-	version := prefix.NewCommitVersionParser(commitVersion).MustParse()
-
-	return strings.TrimSpace(version)
-}
-
-// createTag creates a new Git tag pointing to specific commit
-func (d *DefaultClient) createTag(versionTag tag.Tag, sha string) error {
-	ctx, cancel := context.WithTimeout(context.TODO(), 30*time.Second)
-	defer cancel()
-
-	// tag the commit
-	tagRefName := versionTag.Ref()
-	_, _, err := d.client.Git.CreateRef(ctx, d.owner, d.repo, &github.Reference{
-		Ref: &tagRefName,
-		Object: &github.GitObject{
-			SHA: &sha,
-		},
-	})
-
-	return err
-}
-
-// createBranch creates a new branch pointing to specific commit
-func (d *DefaultClient) createBranch(branchName, sha string) error {
-	ctx, cancel := context.WithTimeout(context.TODO(), 30*time.Second)
-	defer cancel()
-
-	branchRefName := branchRef(branchName)
-	_, _, err := d.client.Git.CreateRef(ctx, d.owner, d.repo, &github.Reference{
-		Ref: &branchRefName,
-		Object: &github.GitObject{
-			SHA: &sha,
-		},
-	})
-
-	return err
-}
-
-func (d *DefaultClient) createReleaseByTag(tag string) *github.RepositoryRelease {
-	ctx, cancel := context.WithTimeout(context.TODO(), 30*time.Second)
-	defer cancel()
-
-	branch := _defaultReleaseBranch
-
-	makeLatest := "true"
-	if _, isLegacy := d.isLegacyVersion(); isLegacy {
-		makeLatest = "legacy"
-	}
-	generateRelease := true
-
-	release, _, err := d.client.Repositories.CreateRelease(ctx, d.owner, d.repo, &github.RepositoryRelease{
-		TagName:              &tag,
-		TargetCommitish:      &branch,
-		Name:                 &tag,
-		MakeLatest:           &makeLatest,
-		GenerateReleaseNotes: &generateRelease,
-	})
-	must(err)
-
-	return release
-}
-
-func (d *DefaultClient) uploadToRelease(fileName string, size int64, reader io.Reader, release *github.RepositoryRelease) {
-	ctx, cancel := context.WithTimeout(context.TODO(), 30*time.Second)
-	defer cancel()
-
-	url := fmt.Sprintf("repos/%s/%s/releases/%d/assets?name=%s", d.owner, d.repo, release.GetID(), fileName)
-
-	req, err := d.client.NewUploadRequest(url, reader, size, "application/zip")
-	must(err)
-
-	asset := new(github.ReleaseAsset)
-	_, err = d.client.Do(ctx, req, asset)
-	must(err)
-}
-
-func (d *DefaultClient) uploadArtifact(wg *sync.WaitGroup, artifactID int64, release *github.RepositoryRelease) {
-	ctx, cancel := context.WithTimeout(context.TODO(), 30*time.Second)
-	defer wg.Done()
-	defer cancel()
-
-	url, _, err := d.client.Actions.DownloadArtifact(ctx, d.owner, d.repo,
-		artifactID, 0)
-
-	must(err)
-
-	httpClient := &http.Client{Timeout: 30 * time.Second}
-
-	resp, err := httpClient.Get(url.String())
-	must(err)
-	defer resp.Body.Close()
-
-	disposition := resp.Header.Get("Content-Disposition")
-	_, params, err := mime.ParseMediaType(disposition)
-	must(err)
-
-	fileName, ok := params["filename"]
-	if !ok {
-		panic("no filename found in Content-Disposition")
-	}
-
-	fmt.Printf("Upload %s to %s\n", fileName, release.GetName())
-
-	d.uploadToRelease(fileName, resp.ContentLength, resp.Body, release)
-}
-
-func (d *DefaultClient) uploadArtifactsToRelease(release *github.RepositoryRelease) (files []*os.File) {
-	ctx, cancel := context.WithTimeout(context.TODO(), 30*time.Second)
-	defer cancel()
-
-	artifacts, _, err := d.client.Actions.ListWorkflowRunArtifacts(ctx, d.owner, d.repo,
-		env.WorkflowID(), &github.ListOptions{})
-
-	must(err)
-
-	if artifacts.GetTotalCount() == 0 {
-		panic("no artifact found")
-	}
-
-	var wg sync.WaitGroup
-	wg.Add(len(artifacts.Artifacts))
-	for _, artifact := range artifacts.Artifacts {
-		go d.uploadArtifact(&wg, artifact.GetID(), release)
-	}
-	wg.Wait()
-	return
-}
-
-// removeBranch deletes a branch from the repository
-func (d *DefaultClient) removeBranch(branchName string) error {
-	ctx, cancel := context.WithTimeout(context.TODO(), 30*time.Second)
-	defer cancel()
-
-	_, err := d.client.Git.DeleteRef(ctx, d.owner, d.repo, branchRef(branchName))
-
-	return err
-}
-
-// checkVersion performs version validation and configuration checks
-func (d *DefaultClient) checkVersion(ver *versions.Versions, cfg config.LLPkgConfig) {
-	// 4. Check MappedVersion
-	version := d.checkMappedVersion(cfg.Upstream.Package.Name)
-	_, mappedVersion := version.MustParse()
-	// 5. Check version is valid
-	_, isLegacy := d.isLegacyVersion()
-	checkLegacyVersion(ver, cfg, mappedVersion, isLegacy)
 }
 
 // CheckPR validates PR changes and returns affected packages
@@ -565,4 +278,290 @@ func (d *DefaultClient) CleanResource() {
 	}
 
 	d.removeLabel(labelName)
+}
+
+// hasBranch checks existence of a specific branch in the repository
+func (d *DefaultClient) hasBranch(branchName string) bool {
+	ctx, cancel := context.WithTimeout(context.TODO(), 30*time.Second)
+	defer cancel()
+
+	branch, resp, err := d.client.Repositories.GetBranch(
+		ctx, d.owner, d.repo, branchName, 0,
+	)
+
+	return err == nil && branch != nil &&
+		resp.StatusCode == http.StatusOK
+}
+
+// associatedWithPullRequest finds all pull requests containing the specified commit
+func (d *DefaultClient) associatedWithPullRequest(sha string) []*github.PullRequest {
+	ctx, cancel := context.WithTimeout(context.TODO(), 30*time.Second)
+	defer cancel()
+
+	pulls, _, err := d.client.PullRequests.ListPullRequestsWithCommit(
+		ctx, d.owner, d.repo, sha, &github.ListOptions{},
+	)
+	must(err)
+	return pulls
+}
+
+// isAssociatedWithPullRequest checks if commit belongs to a closed pull request
+func (d *DefaultClient) isAssociatedWithPullRequest(sha string) bool {
+	pulls := d.associatedWithPullRequest(sha)
+	// don't use GetMerge, because GetMerge may be a mistake.
+	// sometime, when a pull request is merged, GetMerge still returns false.
+	// so checking pull request state is more accurate.
+	return len(pulls) > 0 &&
+		pulls[0].GetState() == "closed"
+}
+
+// isLegacyVersion determines if PR targets a legacy branch
+func (d *DefaultClient) isLegacyVersion() (branchName string, legacy bool) {
+	pullRequest, ok := GitHubEvent()["pull_request"].(map[string]any)
+	if !ok {
+		// if this actions is not triggered by pull request, fallback to call API.
+		pulls := d.associatedWithPullRequest(env.LatestCommitSHA())
+		if len(pulls) == 0 {
+			panic("this commit is not associated with a pull request, this should not happen")
+		}
+		branchName = pulls[0].GetBase().GetRef()
+	} else {
+		// unnecessary to check type, because currentPRCommit has been checked.
+		base := pullRequest["base"].(map[string]any)
+		branchName = base["ref"].(string)
+	}
+
+	legacy = isLegacyBranch(branchName)
+	return
+}
+
+// currentPRCommit retrieves all commits in the current pull request
+func (d *DefaultClient) currentPRCommit() []*github.RepositoryCommit {
+	pullRequest := PullRequestEvent()
+	prNumber := int(pullRequest["number"].(float64))
+
+	ctx, cancel := context.WithTimeout(context.TODO(), 30*time.Second)
+	defer cancel()
+	// use authorized API to avoid Github RateLimit
+	commits, _, err := d.client.PullRequests.ListCommits(
+		ctx, d.owner, d.repo, prNumber,
+		&github.ListOptions{},
+	)
+	must(err)
+	return commits
+}
+
+// allCommits retrieves all repository commits
+func (d *DefaultClient) allCommits() []*github.RepositoryCommit {
+	ctx, cancel := context.WithTimeout(context.TODO(), 30*time.Second)
+	defer cancel()
+	// use authorized API to avoid Github RateLimit
+	commits, _, err := d.client.Repositories.ListCommits(
+		ctx, d.owner, d.repo,
+		&github.CommitsListOptions{},
+	)
+	must(err)
+	return commits
+}
+
+// removeLabel deletes a label from the repository
+func (d *DefaultClient) removeLabel(labelName string) {
+	ctx, cancel := context.WithTimeout(context.TODO(), 30*time.Second)
+	defer cancel()
+	// use authorized API to avoid Github RateLimit
+	_, err := d.client.Issues.DeleteLabel(
+		ctx, d.owner, d.repo, labelName,
+	)
+	must(err)
+}
+
+// checkMappedVersion validates PR contains valid "Release-as" version declaration
+func (d *DefaultClient) checkMappedVersion(packageName string) mappedversion.MappedVersion {
+	matchMappedVersion := regex(packageName)
+
+	var rawMappedVersion string
+
+	for _, commit := range d.currentPRCommit() {
+		message := commit.GetCommit().GetMessage()
+		if rawMappedVersion = matchMappedVersion.FindString(message); rawMappedVersion != "" {
+			// remove space, of course
+			rawMappedVersion = strings.TrimSpace(rawMappedVersion)
+			break
+		}
+	}
+
+	if rawMappedVersion == "" {
+		panic("no MappedVersion found in the PR")
+	}
+
+	return mappedversion.From(rawMappedVersion)
+}
+
+// commitMessage retrieves commit details by SHA
+func (d *DefaultClient) commitMessage(sha string) *github.RepositoryCommit {
+	ctx, cancel := context.WithTimeout(context.TODO(), 30*time.Second)
+	defer cancel()
+
+	commit, _, err := d.client.Repositories.GetCommit(ctx, d.owner, d.repo, sha, &github.ListOptions{})
+	must(err)
+	return commit
+}
+
+// mappedVersion parses the latest commit's mapped version from "Release-as" directive
+func (d *DefaultClient) mappedVersion() string {
+	// get message
+	message := d.commitMessage(env.LatestCommitSHA()).GetCommit().GetMessage()
+
+	// parse the mapped version
+	commitVersion := regex(".*").FindString(message)
+	// mapped version not found, a normal commit?
+	if commitVersion == "" {
+		return ""
+	}
+	version := prefix.NewCommitVersionParser(commitVersion).MustParse()
+
+	return strings.TrimSpace(version)
+}
+
+// createTag creates a new Git tag pointing to specific commit
+func (d *DefaultClient) createTag(versionTag tag.Tag, sha string) error {
+	ctx, cancel := context.WithTimeout(context.TODO(), 30*time.Second)
+	defer cancel()
+
+	// tag the commit
+	tagRefName := versionTag.Ref()
+	_, _, err := d.client.Git.CreateRef(ctx, d.owner, d.repo, &github.Reference{
+		Ref: &tagRefName,
+		Object: &github.GitObject{
+			SHA: &sha,
+		},
+	})
+
+	return err
+}
+
+// createBranch creates a new branch pointing to specific commit
+func (d *DefaultClient) createBranch(branchName, sha string) error {
+	ctx, cancel := context.WithTimeout(context.TODO(), 30*time.Second)
+	defer cancel()
+
+	branchRefName := branchRef(branchName)
+	_, _, err := d.client.Git.CreateRef(ctx, d.owner, d.repo, &github.Reference{
+		Ref: &branchRefName,
+		Object: &github.GitObject{
+			SHA: &sha,
+		},
+	})
+
+	return err
+}
+
+func (d *DefaultClient) createReleaseByTag(tag string) *github.RepositoryRelease {
+	ctx, cancel := context.WithTimeout(context.TODO(), 30*time.Second)
+	defer cancel()
+
+	branch := _defaultReleaseBranch
+
+	makeLatest := "true"
+	if _, isLegacy := d.isLegacyVersion(); isLegacy {
+		makeLatest = "legacy"
+	}
+	generateRelease := true
+
+	release, _, err := d.client.Repositories.CreateRelease(ctx, d.owner, d.repo, &github.RepositoryRelease{
+		TagName:              &tag,
+		TargetCommitish:      &branch,
+		Name:                 &tag,
+		MakeLatest:           &makeLatest,
+		GenerateReleaseNotes: &generateRelease,
+	})
+	must(err)
+
+	return release
+}
+
+func (d *DefaultClient) uploadToRelease(fileName string, size int64, reader io.Reader, release *github.RepositoryRelease) {
+	ctx, cancel := context.WithTimeout(context.TODO(), 30*time.Second)
+	defer cancel()
+
+	url := fmt.Sprintf("repos/%s/%s/releases/%d/assets?name=%s", d.owner, d.repo, release.GetID(), fileName)
+
+	req, err := d.client.NewUploadRequest(url, reader, size, "application/zip")
+	must(err)
+
+	asset := new(github.ReleaseAsset)
+	_, err = d.client.Do(ctx, req, asset)
+	must(err)
+}
+
+func (d *DefaultClient) uploadArtifactToRelease(wg *sync.WaitGroup, artifactID int64, release *github.RepositoryRelease) {
+	ctx, cancel := context.WithTimeout(context.TODO(), 30*time.Second)
+	defer wg.Done()
+	defer cancel()
+
+	url, _, err := d.client.Actions.DownloadArtifact(ctx, d.owner, d.repo,
+		artifactID, 0)
+
+	must(err)
+
+	httpClient := &http.Client{Timeout: 30 * time.Second}
+
+	resp, err := httpClient.Get(url.String())
+	must(err)
+	defer resp.Body.Close()
+
+	disposition := resp.Header.Get("Content-Disposition")
+	_, params, err := mime.ParseMediaType(disposition)
+	must(err)
+
+	fileName, ok := params["filename"]
+	if !ok {
+		panic("no filename found in Content-Disposition")
+	}
+
+	fmt.Printf("Upload %s to %s\n", fileName, release.GetName())
+
+	d.uploadToRelease(fileName, resp.ContentLength, resp.Body, release)
+}
+
+func (d *DefaultClient) uploadArtifactsToRelease(release *github.RepositoryRelease) (files []*os.File) {
+	ctx, cancel := context.WithTimeout(context.TODO(), 30*time.Second)
+	defer cancel()
+
+	artifacts, _, err := d.client.Actions.ListWorkflowRunArtifacts(ctx, d.owner, d.repo,
+		env.WorkflowID(), &github.ListOptions{})
+
+	must(err)
+
+	if artifacts.GetTotalCount() == 0 {
+		panic("no artifact found")
+	}
+
+	var wg sync.WaitGroup
+	wg.Add(len(artifacts.Artifacts))
+	for _, artifact := range artifacts.Artifacts {
+		go d.uploadArtifactToRelease(&wg, artifact.GetID(), release)
+	}
+	wg.Wait()
+	return
+}
+
+// removeBranch deletes a branch from the repository
+func (d *DefaultClient) removeBranch(branchName string) error {
+	ctx, cancel := context.WithTimeout(context.TODO(), 30*time.Second)
+	defer cancel()
+
+	_, err := d.client.Git.DeleteRef(ctx, d.owner, d.repo, branchRef(branchName))
+
+	return err
+}
+
+// checkVersion performs version validation and configuration checks
+func (d *DefaultClient) checkVersion(ver *versions.Versions, cfg config.LLPkgConfig) {
+	// 4. Check MappedVersion
+	version := d.checkMappedVersion(cfg.Upstream.Package.Name)
+	_, mappedVersion := version.MustParse()
+	// 5. Check version is valid
+	_, isLegacy := d.isLegacyVersion()
+	checkLegacyVersion(ver, cfg, mappedVersion, isLegacy)
 }

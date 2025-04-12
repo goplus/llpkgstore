@@ -3,6 +3,7 @@ package actions
 import (
 	"encoding/json"
 	"fmt"
+	"log"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -98,7 +99,7 @@ func IssueEvent() map[string]any {
 // Ensures semantic versioning compliance and proper branch maintenance strategy
 func checkLegacyVersion(ver *versions.Versions, cfg config.LLPkgConfig, mappedVersion string, isLegacy bool) {
 	if slices.Contains(ver.GoVersions(cfg.Upstream.Package.Name), mappedVersion) {
-		panic("repeat semver")
+		log.Fatalf("repeat semver: %s", mappedVersion)
 	}
 	vers := ver.CVersions(cfg.Upstream.Package.Name)
 	currentVersion := versions.ToSemVer(cfg.Upstream.Package.Version)
