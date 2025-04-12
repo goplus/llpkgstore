@@ -9,7 +9,7 @@ import (
 type Tag string
 
 func From(tag string) Tag {
-	return Tag(tag)
+	return Tag(strings.TrimSpace(tag))
 }
 
 // SHA retrieves commit SHA for given Git tag
@@ -30,7 +30,7 @@ func (t Tag) Exist() bool {
 
 // tagRef constructs full Git tag reference string (e.g. "refs/tags/v1.0.0")
 func (t Tag) Ref() string {
-	return "refs/tags/" + strings.TrimSpace(t.String())
+	return "refs/tags/" + t.String()
 }
 
 func (t Tag) String() string {
