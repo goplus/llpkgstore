@@ -14,7 +14,7 @@ import (
 // Versions is a mapping table implement for Github Action only.
 // It's recommend to use another implement in llgo for common usage.
 type Versions struct {
-	metadata.MetadataMap
+	m metadata.MetadataMap
 
 	fileName string
 }
@@ -57,15 +57,15 @@ func Read(fileName string) *Versions {
 	}
 
 	return &Versions{
-		MetadataMap: m,
-		fileName:    f.Name(),
+		m:        m,
+		fileName: f.Name(),
 	}
 }
 
 // CVersions returns all available versions of the specified C library.
 // The versions are returned as semantic version strings.
 func (v *Versions) CVersions(clib string) (ret []string) {
-	versions := v.MetadataMap[clib]
+	versions := v.m[clib]
 	if versions == nil {
 		return
 	}
@@ -77,7 +77,7 @@ func (v *Versions) CVersions(clib string) (ret []string) {
 
 // GoVersions lists all Go versions associated with the given C library.
 func (v *Versions) GoVersions(clib string) (ret []string) {
-	versions := v.MetadataMap[clib]
+	versions := v.m[clib]
 	if versions == nil {
 		return
 	}
@@ -132,32 +132,32 @@ func (v *Versions) Write(clib, clibVersion, mappedVersion string) {
 	versions := v.goVersion(clib, clibVersion)
 
 	// TODO(ghl): rewrite llpkgstore.json
-	v.MetadataMap[clib].Versions[clibVersion] = appendVersion(versions, mappedVersion)
+	v.m[clib].Versions[clibVersion] = appendVersion(versions, mappedVersion)
 
 	// sync to disk
-	b, _ := json.Marshal(&v.MetadataMap)
+	b, _ := json.Marshal(&v.m)
 
 	os.WriteFile(v.fileName, []byte(b), 0644)
 }
 
 // String returns the JSON representation of the Versions metadata.
 func (v *Versions) String() string {
-	b, _ := json.Marshal(&v.MetadataMap)
+	b, _ := json.Marshal(&v.m)
 	return string(b)
 }
 
 func (v *Versions) initCVersion(clib string) {
-	clibVersions := v.MetadataMap[clib]
+	clibVersions := v.m[clib]
 	if clibVersions == nil {
 		clibVersions = &metadata.Metadata{
 			Versions: map[metadata.CVersion][]metadata.GoVersion{},
 		}
-		v.MetadataMap[clib] = clibVersions
+		v.m[clib] = clibVersions
 	}
 }
 
 func (v *Versions) goVersion(clib, clibVersion string) []metadata.GoVersion {
-	clibVersions := v.MetadataMap[clib]
+	clibVersions := v.m[clib]
 	if clibVersions == nil {
 		return nil
 	}
@@ -167,7 +167,7 @@ func (v *Versions) goVersion(clib, clibVersion string) []metadata.GoVersion {
 // cVersions retrieves the version mappings for a specific C library.
 // It returns a map where keys are C library versions and values are supported Go versions.
 func (v *Versions) cVersions(clib string) map[metadata.CVersion][]metadata.GoVersion {
-	versions := v.MetadataMap[clib]
+	versions := v.m[clib]
 	if versions == nil {
 		return nil
 	}
