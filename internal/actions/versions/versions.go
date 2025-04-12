@@ -90,6 +90,9 @@ func (v *Versions) GoVersions(clib string) (ret []string) {
 // LatestGoVersionForCVersion finds the latest Go version compatible with a specific C library version.
 func (v *Versions) LatestGoVersionForCVersion(clib, cver string) string {
 	goVersions := v.goVersion(clib, cver)
+	if len(goVersions) == 0 {
+		return ""
+	}
 	semver.Sort(goVersions)
 	return goVersions[len(goVersions)-1]
 }
