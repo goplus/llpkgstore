@@ -2,7 +2,6 @@ package actions
 
 import (
 	"os"
-	"strings"
 	"testing"
 
 	"github.com/goplus/llpkgstore/config"
@@ -13,7 +12,7 @@ func recoverFn(branchName string, fn func(legacy bool)) (ret any) {
 	defer func() {
 		ret = recover()
 	}()
-	fn(strings.HasPrefix(branchName, BranchPrefix))
+	fn(isLegacyBranch(branchName))
 	return
 }
 

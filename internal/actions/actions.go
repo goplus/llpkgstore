@@ -3,7 +3,6 @@ package actions
 import (
 	"encoding/json"
 	"fmt"
-	"log"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -13,6 +12,7 @@ import (
 	"sync"
 
 	"github.com/goplus/llpkgstore/config"
+	"github.com/goplus/llpkgstore/internal/actions/parser/prefix"
 	"github.com/goplus/llpkgstore/internal/actions/versions"
 	"golang.org/x/mod/semver"
 )
@@ -26,6 +26,24 @@ var (
 	_currentSuffix = runtime.GOOS + "_" + runtime.GOARCH
 )
 
+// parseGitHubEvent parses the GitHub event payload from GITHUB_EVENT_PATH into a map
+func parseGitHubEvent() map[string]any {
+	eventFileName := os.Getenv("GITHUB_EVENT_PATH")
+	if eventFileName == "" {
+		panic("cannot get GITHUB_EVENT_PATH")
+	}
+	event, err := os.ReadFile(eventFileName)
+	must(err)
+
+	var m map[string]any
+	json.Unmarshal([]byte(event), &m)
+
+	if len(m) == 0 {
+		panic("cannot parse GITHUB_EVENT_PATH")
+	}
+	return m
+}
+
 // must panics if the error is non-nil, halting execution
 func must(err error) {
 	if err != nil {
@@ -37,23 +55,25 @@ func binaryZip(packageName string) string {
 	return fmt.Sprintf("%s_%s.zip", packageName, _currentSuffix)
 }
 
-// parseGitHubEvent parses the GitHub event payload from GITHUB_EVENT_PATH into a map
-func parseGitHubEvent() map[string]any {
-	eventFileName := os.Getenv("GITHUB_EVENT_PATH")
-	if eventFileName == "" {
-		panic("cannot get GITHUB_EVENT_PATH")
-	}
-	event, err := os.ReadFile(eventFileName)
-	if err != nil {
-		panic(err)
-	}
-	var m map[string]any
-	json.Unmarshal([]byte(event), &m)
+// branchRef generates full Git branch reference string (e.g. "refs/heads/main")
+func branchRef(branchName string) string {
+	return "refs/heads/" + strings.TrimSpace(branchName)
+}
 
-	if len(m) == 0 {
-		panic("cannot parse GITHUB_EVENT_PATH")
+func isLegacyBranch(branchName string) bool {
+	return strings.HasPrefix(branchName, prefix.BranchPrefix)
+}
+
+// isValidLLPkg checks if directory contains both llpkg.cfg and llcppg.cfg
+func isValidLLPkg(files []os.DirEntry) bool {
+	fileMap := make(map[string]struct{}, len(files))
+
+	for _, file := range files {
+		fileMap[filepath.Base(file.Name())] = struct{}{}
 	}
-	return m
+	_, hasLLPkg := fileMap["llpkg.cfg"]
+	_, hasLLCppg := fileMap["llcppg.cfg"]
+	return hasLLCppg && hasLLPkg
 }
 
 // PullRequestEvent extracts pull request details from the parsed GitHub event data
@@ -72,31 +92,6 @@ func IssueEvent() map[string]any {
 		panic("cannot parse GITHUB_EVENT_PATH pull_request")
 	}
 	return issue
-}
-
-// branchRef generates full Git branch reference string (e.g. "refs/heads/main")
-func branchRef(branchName string) string {
-	return "refs/heads/" + strings.TrimSpace(branchName)
-}
-
-// isValidLLPkg checks if directory contains both llpkg.cfg and llcppg.cfg
-func isValidLLPkg(files []os.DirEntry) bool {
-	fileMap := make(map[string]struct{}, len(files))
-
-	for _, file := range files {
-		fileMap[filepath.Base(file.Name())] = struct{}{}
-	}
-	_, hasLLPkg := fileMap["llpkg.cfg"]
-	_, hasLLCppg := fileMap["llcppg.cfg"]
-	return hasLLCppg && hasLLPkg
-}
-
-func mustTrimPrefix(s, prefix string) string {
-	result := strings.TrimPrefix(s, prefix)
-	if result == s {
-		log.Fatalf("invalid format: %s", result)
-	}
-	return result
 }
 
 // checkLegacyVersion validates versioning strategy for legacy package submissions

@@ -17,35 +17,15 @@ import (
 	"github.com/google/go-github/v69/github"
 	"github.com/goplus/llpkgstore/config"
 	"github.com/goplus/llpkgstore/internal/actions/env"
-	"github.com/goplus/llpkgstore/internal/actions/mappedversion"
+	"github.com/goplus/llpkgstore/internal/actions/parser/mappedversion"
+	"github.com/goplus/llpkgstore/internal/actions/parser/prefix"
 	"github.com/goplus/llpkgstore/internal/actions/tag"
 	"github.com/goplus/llpkgstore/internal/actions/versions"
 	"github.com/goplus/llpkgstore/internal/file"
 	"github.com/goplus/llpkgstore/internal/pc"
 )
 
-const (
-	LabelPrefix         = "branch:"
-	BranchPrefix        = "release-branch."
-	MappedVersionPrefix = "Release-as: "
-
-	_defaultReleaseBranch = "main"
-	_regexString          = `Release-as:\s%s/v(?P<major>0|[1-9]\d*)\.(?P<minor>0|[1-9]\d*)\.(?P<patch>0|[1-9]\d*)(?:-(?P<prerelease>(?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*)(?:\.(?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*))*))?(?:\+(?P<buildmetadata>[0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?`
-)
-
-// regex compiles a regular expression pattern to detect "Release-as" directives in commit messages
-// Parameters:
-//
-//	packageName: Name of the package to format into the regex pattern
-//
-// Returns:
-//
-//	*regexp.Regexp: Compiled regular expression for version parsing
-func regex(packageName string) *regexp.Regexp {
-	// format: Release-as: clib/semver(with v prefix)
-	// Must have one space in the end of Release-as:
-	return regexp.MustCompile(fmt.Sprintf(_regexString, packageName))
-}
+const _defaultReleaseBranch = "main"
 
 // DefaultClient provides GitHub API client capabilities with authentication for Actions workflows
 type DefaultClient struct {
@@ -58,13 +38,6 @@ type DefaultClient struct {
 }
 
 // NewDefaultClient initializes a new GitHub API client with authentication and repository configuration
-// Uses:
-//   - GitHub token from environment
-//   - Repository info from GITHUB_REPOSITORY context
-//
-// Returns:
-//
-//	*DefaultClient: Configured client instance
 func NewDefaultClient() *DefaultClient {
 	dc := &DefaultClient{
 		client: github.NewClient(nil).WithAuthToken(env.Token()),
@@ -74,13 +47,6 @@ func NewDefaultClient() *DefaultClient {
 }
 
 // hasBranch checks existence of a specific branch in the repository
-// Parameters:
-//
-//	branchName: Name of the branch to check
-//
-// Returns:
-//
-//	bool: True if branch exists
 func (d *DefaultClient) hasBranch(branchName string) bool {
 	ctx, cancel := context.WithTimeout(context.TODO(), 30*time.Second)
 	defer cancel()
@@ -94,13 +60,6 @@ func (d *DefaultClient) hasBranch(branchName string) bool {
 }
 
 // associatedWithPullRequest finds all pull requests containing the specified commit
-// Parameters:
-//
-//	sha: Commit hash to search for
-//
-// Returns:
-//
-//	[]*github.PullRequest: List of associated pull requests
 func (d *DefaultClient) associatedWithPullRequest(sha string) []*github.PullRequest {
 	ctx, cancel := context.WithTimeout(context.TODO(), 30*time.Second)
 	defer cancel()
@@ -113,13 +72,6 @@ func (d *DefaultClient) associatedWithPullRequest(sha string) []*github.PullRequ
 }
 
 // isAssociatedWithPullRequest checks if commit belongs to a closed pull request
-// Parameters:
-//
-//	sha: Commit hash to check
-//
-// Returns:
-//
-//	bool: True if part of closed PR
 func (d *DefaultClient) isAssociatedWithPullRequest(sha string) bool {
 	pulls := d.associatedWithPullRequest(sha)
 	// don't use GetMerge, because GetMerge may be a mistake.
@@ -130,35 +82,26 @@ func (d *DefaultClient) isAssociatedWithPullRequest(sha string) bool {
 }
 
 // isLegacyVersion determines if PR targets a legacy branch
-// Returns:
-//
-//	branchName: Base branch name
-//	legacy: True if branch starts with "release-branch."
 func (d *DefaultClient) isLegacyVersion() (branchName string, legacy bool) {
 	pullRequest, ok := GitHubEvent()["pull_request"].(map[string]any)
-	var refName string
 	if !ok {
 		// if this actions is not triggered by pull request, fallback to call API.
 		pulls := d.associatedWithPullRequest(env.LatestCommitSHA())
 		if len(pulls) == 0 {
 			panic("this commit is not associated with a pull request, this should not happen")
 		}
-		refName = pulls[0].GetBase().GetRef()
+		branchName = pulls[0].GetBase().GetRef()
 	} else {
 		// unnecessary to check type, because currentPRCommit has been checked.
 		base := pullRequest["base"].(map[string]any)
-		refName = base["ref"].(string)
+		branchName = base["ref"].(string)
 	}
 
-	legacy = strings.HasPrefix(refName, BranchPrefix)
-	branchName = refName
+	legacy = isLegacyBranch(branchName)
 	return
 }
 
 // currentPRCommit retrieves all commits in the current pull request
-// Returns:
-//
-//	[]*github.RepositoryCommit: List of PR commits
 func (d *DefaultClient) currentPRCommit() []*github.RepositoryCommit {
 	pullRequest := PullRequestEvent()
 	prNumber := int(pullRequest["number"].(float64))
@@ -175,9 +118,6 @@ func (d *DefaultClient) currentPRCommit() []*github.RepositoryCommit {
 }
 
 // allCommits retrieves all repository commits
-// Returns:
-//
-//	[]*github.RepositoryCommit: List of all commits
 func (d *DefaultClient) allCommits() []*github.RepositoryCommit {
 	ctx, cancel := context.WithTimeout(context.TODO(), 30*time.Second)
 	defer cancel()
@@ -191,9 +131,6 @@ func (d *DefaultClient) allCommits() []*github.RepositoryCommit {
 }
 
 // removeLabel deletes a label from the repository
-// Parameters:
-//
-//	labelName: Name of the label to remove
 func (d *DefaultClient) removeLabel(labelName string) {
 	ctx, cancel := context.WithTimeout(context.TODO(), 30*time.Second)
 	defer cancel()
@@ -205,17 +142,6 @@ func (d *DefaultClient) removeLabel(labelName string) {
 }
 
 // checkMappedVersion validates PR contains valid "Release-as" version declaration
-// Parameters:
-//
-//	packageName: Target package name for version mapping
-//
-// Returns:
-//
-//	string: Validated mapped version string
-//
-// Panics:
-//
-//	If no valid version found in PR commits
 func (d *DefaultClient) checkMappedVersion(packageName string) mappedversion.MappedVersion {
 	matchMappedVersion := regex(packageName)
 
@@ -238,13 +164,6 @@ func (d *DefaultClient) checkMappedVersion(packageName string) mappedversion.Map
 }
 
 // commitMessage retrieves commit details by SHA
-// Parameters:
-//
-//	sha: Commit hash to retrieve
-//
-// Returns:
-//
-//	*github.RepositoryCommit: Commit details object
 func (d *DefaultClient) commitMessage(sha string) *github.RepositoryCommit {
 	ctx, cancel := context.WithTimeout(context.TODO(), 30*time.Second)
 	defer cancel()
@@ -255,37 +174,22 @@ func (d *DefaultClient) commitMessage(sha string) *github.RepositoryCommit {
 }
 
 // mappedVersion parses the latest commit's mapped version from "Release-as" directive
-// Returns:
-//
-//	string: Parsed version string or empty if not found
-//
-// Panics:
-//
-//	If version format is invalid
 func (d *DefaultClient) mappedVersion() string {
 	// get message
 	message := d.commitMessage(env.LatestCommitSHA()).GetCommit().GetMessage()
 
 	// parse the mapped version
-	mappedVersion := regex(".*").FindString(message)
+	commitVersion := regex(".*").FindString(message)
 	// mapped version not found, a normal commit?
-	if mappedVersion == "" {
+	if commitVersion == "" {
 		return ""
 	}
-	version := mustTrimPrefix(mappedVersion, MappedVersionPrefix)
+	version := prefix.NewCommitVersionParser(commitVersion).MustParse()
 
 	return strings.TrimSpace(version)
 }
 
 // createTag creates a new Git tag pointing to specific commit
-// Parameters:
-//
-//	tag: Tag name (e.g. "v1.2.3")
-//	sha: Target commit hash
-//
-// Returns:
-//
-//	error: Error during tag creation
 func (d *DefaultClient) createTag(versionTag tag.Tag, sha string) error {
 	ctx, cancel := context.WithTimeout(context.TODO(), 30*time.Second)
 	defer cancel()
@@ -303,14 +207,6 @@ func (d *DefaultClient) createTag(versionTag tag.Tag, sha string) error {
 }
 
 // createBranch creates a new branch pointing to specific commit
-// Parameters:
-//
-//	branchName: New branch name
-//	sha: Target commit hash
-//
-// Returns:
-//
-//	error: Error during branch creation
 func (d *DefaultClient) createBranch(branchName, sha string) error {
 	ctx, cancel := context.WithTimeout(context.TODO(), 30*time.Second)
 	defer cancel()
@@ -417,13 +313,6 @@ func (d *DefaultClient) uploadArtifactsToRelease(release *github.RepositoryRelea
 }
 
 // removeBranch deletes a branch from the repository
-// Parameters:
-//
-//	branchName: Name of the branch to delete
-//
-// Returns:
-//
-//	error: Error during branch deletion
 func (d *DefaultClient) removeBranch(branchName string) error {
 	ctx, cancel := context.WithTimeout(context.TODO(), 30*time.Second)
 	defer cancel()
@@ -434,10 +323,6 @@ func (d *DefaultClient) removeBranch(branchName string) error {
 }
 
 // checkVersion performs version validation and configuration checks
-// Parameters:
-//
-//	ver: Version store object
-//	cfg: Package configuration
 func (d *DefaultClient) checkVersion(ver *versions.Versions, cfg config.LLPkgConfig) {
 	// 4. Check MappedVersion
 	version := d.checkMappedVersion(cfg.Upstream.Package.Name)
@@ -448,9 +333,6 @@ func (d *DefaultClient) checkVersion(ver *versions.Versions, cfg config.LLPkgCon
 }
 
 // CheckPR validates PR changes and returns affected packages
-// Returns:
-//
-//	[]string: List of affected package paths
 func (d *DefaultClient) CheckPR() []string {
 	// build a file path map
 	pathMap := map[string][]string{}
@@ -610,13 +492,13 @@ func (d *DefaultClient) Release() {
 // Follows naming convention: release-branch.<CLibraryName>/<MappedVersion>
 func (d *DefaultClient) CreateBranchFromLabel(labelName string) {
 	// design: branch:release-branch.{CLibraryName}/{MappedVersion}
-	branchName := mustTrimPrefix(strings.TrimSpace(labelName), LabelPrefix)
+	branchName := prefix.NewLabelParser(labelName).MustParse()
 
 	// fast-path: branch exists, can skip.
 	if d.hasBranch(branchName) {
 		return
 	}
-	version := mustTrimPrefix(branchName, BranchPrefix)
+	version := prefix.NewBranchParser(branchName).MustParse()
 
 	clib, _ := mappedversion.From(version).MustParse()
 	// slow-path: check the condition if we can create a branch
@@ -672,7 +554,7 @@ func (d *DefaultClient) CleanResource() {
 	for _, labels := range issueEvent["labels"].([]map[string]any) {
 		label := labels["name"].(string)
 
-		if strings.HasPrefix(label, BranchPrefix) {
+		if strings.HasPrefix(label, prefix.BranchPrefix) {
 			labelName = label
 			break
 		}

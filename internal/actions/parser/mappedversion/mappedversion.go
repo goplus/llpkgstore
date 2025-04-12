@@ -22,7 +22,7 @@ func From(version string) MappedVersion {
 // Input format: "clib/semver" where semver starts with 'v'
 // Panics if input format is invalid or version isn't valid semantic version
 func (m MappedVersion) Parse() (clib, mappedVersion string, err error) {
-	arr := strings.Split(string(m), "/")
+	arr := strings.Split(m.String(), "/")
 	if len(arr) != 2 {
 		err = ErrVersionFormat
 		return
@@ -41,4 +41,8 @@ func (m MappedVersion) MustParse() (clib, mappedVersion string) {
 		panic(err)
 	}
 	return
+}
+
+func (m MappedVersion) String() string {
+	return string(m)
 }
