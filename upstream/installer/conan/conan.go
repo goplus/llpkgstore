@@ -1,6 +1,7 @@
 package conan
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -31,6 +32,10 @@ const (
 	%s`
 )
 
+func withShared(options []string) []string {
+	return append([]string{"*:shared=True"}, options...)
+}
+
 func retrievePC(cppInfo map[string]cppInfo) (pcNames []string) {
 	for name, info := range cppInfo {
 		// skip itself
@@ -44,18 +49,65 @@ func retrievePC(cppInfo map[string]cppInfo) (pcNames []string) {
 	return
 }
 
+func buildDependenciesMap(depsInfo dependencyInfo) map[string]string {
+	deps := make(map[string]string)
+
+	// conan require info format: zlib/1.3.Z
+	// 1.3.Z means match the major and minor version with 1.3
+	for _, dep := range depsInfo.Requires {
+		clib, version, ok := strings.Cut(dep, "/")
+		if ok && version != "system" {
+			deps[clib] = ""
+		}
+	}
+
+	return deps
+}
+
+func resolveDependencies(graphInfo graphInfo) (dependencies []upstream.Package) {
+	// 1. find require info from conan graph
+	requireMap := buildDependenciesMap(graphInfo.Info)
+
+	for _, info := range graphInfo.Dependencies {
+		if info.Ref == "" {
+			continue
+		}
+		clib, version, ok := strings.Cut(info.Ref, "/")
+		if !ok {
+			continue
+		}
+		// 2. fill the computed version from conan graph
+		// by the way, remove duplicate elements.
+		if _, ok := requireMap[clib]; ok {
+			requireMap[clib] = version
+		}
+	}
+
+	for clib, version := range requireMap {
+		if version == "" {
+			continue
+		}
+		dependencies = append(dependencies, upstream.Package{
+			Name:    clib,
+			Version: version,
+		})
+	}
+
+	return
+}
+
 // in Conan, actual binary path is in the prefix field of *.pc file
 func (c *conanInstaller) findBinaryPathFromPC(
 	pkg upstream.Package,
 	dir string,
-	installOutput []byte,
+	output []byte,
 ) (
 	binaryDir string,
 	pcNames []string,
 	err error,
 ) {
-	var m conanOutput
-	err = json.Unmarshal(installOutput, &m)
+	var m installOutput
+	err = json.Unmarshal(output, &m)
 	if err != nil {
 		return
 	}
@@ -132,8 +184,7 @@ func (c *conanInstaller) Config() map[string]string {
 
 // options combines Conan default options with user-specified options from configuration
 func (c *conanInstaller) options() []string {
-	arr := strings.Join([]string{`*:shared=True`, c.config["options"]}, " ")
-	return strings.Fields(arr)
+	return strings.Fields(c.config["options"])
 }
 
 // Install executes Conan installation for the specified package into the output directory.
@@ -152,7 +203,7 @@ func (c *conanInstaller) Install(pkg upstream.Package, outputDir string) ([]stri
 	builder.SetArg("output-folder", outputDir)
 	builder.SetArg("format", "json")
 
-	for _, opt := range c.options() {
+	for _, opt := range withShared(c.options()) {
 		builder.SetArg("options", opt)
 	}
 
@@ -210,4 +261,50 @@ func (c *conanInstaller) Search(pkg upstream.Package) ([]string, error) {
 	}
 
 	return ret, nil
+}
+
+// Dependency retrieves the dependencies of a package using Conan's graph info command.
+// It parses the dependency graph to extract required packages and their versions.
+func (c *conanInstaller) Dependency(pkg upstream.Package) (dependencies []upstream.Package, err error) {
+	// conan graph info --requires %s
+	builder := cmdbuilder.NewCmdBuilder(cmdbuilder.WithConanSerializer())
+
+	builder.SetName("conan")
+	builder.SetSubcommand("graph")
+	builder.SetObj("info")
+	builder.SetArg("requires", pkg.Name+"/"+pkg.Version)
+	builder.SetArg("format", "json")
+
+	for _, opt := range c.options() {
+		builder.SetArg("options", opt)
+	}
+
+	var conanError bytes.Buffer
+
+	cmd := builder.Cmd()
+	cmd.Stderr = &conanError
+
+	out, err := cmd.Output()
+	if err != nil {
+		err = errors.New(conanError.String())
+		return
+	}
+
+	var m graphOutput
+	err = json.Unmarshal(out, &m)
+	if err != nil {
+		return
+	}
+	if len(m.Graph.Nodes) == 0 {
+		err = ErrPackageNotFound
+		return
+	}
+
+	for _, graphInfo := range m.Graph.Nodes {
+		if graphInfo.Name == pkg.Name {
+			dependencies = resolveDependencies(graphInfo)
+			break
+		}
+	}
+	return
 }
