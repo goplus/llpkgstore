@@ -1,4 +1,4 @@
-package versions
+package mappingtable
 
 import (
 	"bytes"
@@ -97,6 +97,6 @@ func TestAppend(t *testing.T) {
 	b, _ := os.ReadFile("llpkgstore.json")
 
 	if !bytes.Equal(b, []byte(`{"cjson":{"versions":{"1.7.18":["v1.0.0","v1.0.1"],"1.7.19":["v1.0.2"]}},"libxml":{"versions":{"1.45.1.4":["v1.0.0"],"1.45.1.5":["v1.0.1"]}}}`)) {
-		t.Error("unexpected append result")
+		t.Errorf("unexpected append result: got %s", string(b))
 	}
 }

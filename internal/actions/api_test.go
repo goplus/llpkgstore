@@ -2,35 +2,17 @@ package actions
 
 import (
 	"os"
-	"os/exec"
-	"strings"
 	"testing"
 
 	"github.com/goplus/llpkgstore/config"
-	"github.com/goplus/llpkgstore/internal/actions/versions"
+	"github.com/goplus/llpkgstore/internal/actions/mappingtable"
 )
-
-func TestHasTag(t *testing.T) {
-	if hasTag("aaaaaaaaaaa1.1.4.5.1.4.1.9.1.9") {
-		t.Error("unexpected tag")
-	}
-	exec.Command("git", "tag", "aaaaaaaaaaa1.1.4.5.1.4.1.9.1.9").Run()
-	if !hasTag("aaaaaaaaaaa1.1.4.5.1.4.1.9.1.9") {
-		t.Error("tag doesn't exist")
-	}
-	ret, _ := exec.Command("git", "tag").CombinedOutput()
-	t.Log(string(ret))
-	exec.Command("git", "tag", "-d", "aaaaaaaaaaa1.1.4.5.1.4.1.9.1.9").Run()
-	if hasTag("aaaaaaaaaaa1.1.4.5.1.4.1.9.1.9") {
-		t.Error("unexpected tag")
-	}
-}
 
 func recoverFn(branchName string, fn func(legacy bool)) (ret any) {
 	defer func() {
 		ret = recover()
 	}()
-	fn(strings.HasPrefix(branchName, BranchPrefix))
+	fn(isLegacyBranch(branchName))
 	return
 }
 
@@ -60,7 +42,7 @@ func TestLegacyVersion1(t *testing.T) {
 	defer os.Remove(".llpkgstore.json")
 
 	cfg, _ := config.ParseLLPkgConfig(".llpkg.cfg")
-	ver := versions.Read(".llpkgstore.json")
+	ver := mappingtable.Read(".llpkgstore.json")
 
 	err := recoverFn("main", func(legacy bool) {
 		checkLegacyVersion(ver, cfg, "v0.1.1", legacy)
@@ -101,7 +83,7 @@ func TestLegacyVersion2(t *testing.T) {
 	defer os.Remove(".llpkgstore.json")
 
 	cfg, _ := config.ParseLLPkgConfig(".llpkg.cfg")
-	ver := versions.Read(".llpkgstore.json")
+	ver := mappingtable.Read(".llpkgstore.json")
 
 	err := recoverFn("release-branch.cjson/v0.1.1", func(legacy bool) {
 		checkLegacyVersion(ver, cfg, "v0.1.2", legacy)
@@ -140,7 +122,7 @@ func TestLegacyVersion3(t *testing.T) {
 	defer os.Remove(".llpkgstore.json")
 
 	cfg, _ := config.ParseLLPkgConfig(".llpkg.cfg")
-	ver := versions.Read(".llpkgstore.json")
+	ver := mappingtable.Read(".llpkgstore.json")
 
 	err := recoverFn("main", func(legacy bool) {
 		checkLegacyVersion(ver, cfg, "v0.3.0", legacy)
@@ -179,7 +161,7 @@ func TestLegacyVersion4(t *testing.T) {
 	defer os.Remove(".llpkgstore.json")
 
 	cfg, _ := config.ParseLLPkgConfig(".llpkg.cfg")
-	ver := versions.Read(".llpkgstore.json")
+	ver := mappingtable.Read(".llpkgstore.json")
 
 	err := recoverFn("main", func(legacy bool) {
 		checkLegacyVersion(ver, cfg, "v0.0.1", legacy)
@@ -219,7 +201,7 @@ func TestLegacyVersion5(t *testing.T) {
 	defer os.Remove(".llpkgstore.json")
 
 	cfg, _ := config.ParseLLPkgConfig(".llpkg.cfg")
-	ver := versions.Read(".llpkgstore.json")
+	ver := mappingtable.Read(".llpkgstore.json")
 
 	err := recoverFn("main", func(legacy bool) {
 		checkLegacyVersion(ver, cfg, "v0.1.1", legacy)

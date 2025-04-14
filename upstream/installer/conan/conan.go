@@ -103,7 +103,7 @@ func (c *conanInstaller) findBinaryPathFromPC(
 	output []byte,
 ) (
 	binaryDir string,
-	pcName []string,
+	pcNames []string,
 	err error,
 ) {
 	var m installOutput
@@ -120,7 +120,7 @@ func (c *conanInstaller) findBinaryPathFromPC(
 	// default to package name,
 	// first element is the real pkg-config name of this package
 	// use append here to avoid resizing slice again.
-	pcName = append(pcName, pkg.Name)
+	pcNames = append(pcNames, pkg.Name)
 
 	for _, packageInfo := range m.Graph.Nodes {
 		if packageInfo.Name != pkg.Name {
@@ -134,12 +134,12 @@ func (c *conanInstaller) findBinaryPathFromPC(
 		}
 		if root.Properties.PkgName != "" {
 			// root is the real pkg config name, replace instead.
-			pcName[0] = root.Properties.PkgName
+			pcNames[0] = root.Properties.PkgName
 		}
-		pcName = append(pcName, retrievePC(packageInfo.CppInfo)...)
+		pcNames = append(pcNames, retrievePC(packageInfo.CppInfo)...)
 	}
 
-	pcFile, err := os.ReadFile(filepath.Join(dir, pcName[0]+".pc"))
+	pcFile, err := os.ReadFile(filepath.Join(dir, pcNames[0]+".pc"))
 	if err != nil {
 		return
 	}
@@ -216,7 +216,7 @@ func (c *conanInstaller) Install(pkg upstream.Package, outputDir string) ([]stri
 		// fmt.Println(string(out))
 		return nil, err
 	}
-	binaryDir, pkgConfigName, err := c.findBinaryPathFromPC(pkg, outputDir, ret)
+	binaryDir, pkgConfigNames, err := c.findBinaryPathFromPC(pkg, outputDir, ret)
 	if err != nil {
 		return nil, err
 	}
@@ -226,7 +226,7 @@ func (c *conanInstaller) Install(pkg upstream.Package, outputDir string) ([]stri
 		return nil, err
 	}
 
-	return pkgConfigName, nil
+	return pkgConfigNames, nil
 }
 
 // Search checks Conan remote repository for the specified package availability.
