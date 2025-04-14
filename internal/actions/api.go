@@ -599,6 +599,7 @@ func (d *DefaultClient) Release() {
 	must(err)
 
 	// upload to artifacts in GitHub Action
+	// https://github.com/goplus/llpkg/pull/50/files#diff-95373be0ab51a56a2200c8c07981d82e81569f2cd1e4e2946e2002bb66de766fR56-R60
 	Setenv(map[string]string{
 		"BIN_PATH":     zipFilePath,
 		"BIN_FILENAME": strings.TrimSuffix(zipFilename, ".zip"),
