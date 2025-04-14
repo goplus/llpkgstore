@@ -16,10 +16,11 @@ import (
 	"github.com/google/go-github/v69/github"
 	"github.com/goplus/llpkgstore/config"
 	"github.com/goplus/llpkgstore/internal/actions/env"
+	"github.com/goplus/llpkgstore/internal/actions/mappingtable"
 	"github.com/goplus/llpkgstore/internal/actions/parser/mappedversion"
 	"github.com/goplus/llpkgstore/internal/actions/parser/prefix"
 	"github.com/goplus/llpkgstore/internal/actions/tag"
-	"github.com/goplus/llpkgstore/internal/actions/versions"
+	"github.com/goplus/llpkgstore/internal/actions/version"
 	"github.com/goplus/llpkgstore/internal/file"
 	"github.com/goplus/llpkgstore/internal/pc"
 )
@@ -57,7 +58,7 @@ func (d *DefaultClient) CheckPR() []string {
 
 	var allPaths []string
 
-	ver := versions.Read("llpkgstore.json")
+	ver := mappingtable.Read("llpkgstore.json")
 
 	for path := range pathMap {
 		// don't retrieve files from pr changes, consider about maintenance case
@@ -70,9 +71,7 @@ func (d *DefaultClient) CheckPR() []string {
 		// 3. Check directory name
 		llpkgFile := filepath.Join(path, "llpkg.cfg")
 		cfg, err := config.ParseLLPkgConfig(llpkgFile)
-		if err != nil {
-			panic(err)
-		}
+		must(err)
 		// in our design, directory name should equal to the package name,
 		// which means it's not required to be equal.
 		//
@@ -112,23 +111,23 @@ func (d *DefaultClient) Postprocessing() {
 		panic("not a merge request commit")
 	}
 
-	version := d.mappedVersion()
+	rawMappedVersion := d.retrieveMappedVersion()
 	// skip it when no mapped version is found
-	if version == "" {
+	if rawMappedVersion == "" {
 		panic("no mapped version found in the commit message")
 	}
 
-	clib, mappedVersion := mappedversion.From(version).MustParse()
+	clib, mappedVersion := mappedversion.From(rawMappedVersion).MustParse()
 
 	// the pr has merged, so we can read it.
 	cfg, err := config.ParseLLPkgConfig(filepath.Join(clib, "llpkg.cfg"))
 	must(err)
 
 	// write it to llpkgstore.json
-	ver := versions.Read("llpkgstore.json")
+	ver := mappingtable.Read("llpkgstore.json")
 	ver.Write(clib, cfg.Upstream.Package.Version, mappedVersion)
 
-	versionTag := tag.From(version)
+	versionTag := tag.From(rawMappedVersion)
 
 	if versionTag.Exist() {
 		panic("tag has already existed")
@@ -139,7 +138,7 @@ func (d *DefaultClient) Postprocessing() {
 	}
 
 	// create a release
-	release := d.createReleaseByTag(version)
+	release := d.createReleaseByTag(rawMappedVersion)
 
 	d.uploadArtifactsToRelease(release)
 
@@ -151,7 +150,7 @@ func (d *DefaultClient) Postprocessing() {
 }
 
 func (d *DefaultClient) Release() {
-	version := d.mappedVersion()
+	version := d.retrieveMappedVersion()
 	// skip it when no mapped version is found
 	if version == "" {
 		panic("no mapped version found in the commit message")
@@ -167,7 +166,7 @@ func (d *DefaultClient) Release() {
 
 	tempDir, _ := os.MkdirTemp("", "llpkg-tool")
 
-	deps, err := uc.Installer.Install(uc.Pkg, tempDir)
+	pkgConfigNames, err := uc.Installer.Install(uc.Pkg, tempDir)
 	must(err)
 
 	pkgConfigDir := filepath.Join(tempDir, "lib", "pkgconfig")
@@ -177,10 +176,10 @@ func (d *DefaultClient) Release() {
 	err = os.Mkdir(pkgConfigDir, 0777)
 	must(err)
 
-	for _, pcName := range deps {
+	for _, pcName := range pkgConfigNames {
 		pcFile := filepath.Join(tempDir, pcName+".pc")
 		// generate pc template to lib/pkgconfig
-		err = pc.GenerateTemplateFromPC(pcFile, pkgConfigDir, deps)
+		err = pc.GenerateTemplateFromPC(pcFile, pkgConfigDir, pkgConfigNames)
 		must(err)
 	}
 
@@ -211,27 +210,27 @@ func (d *DefaultClient) CreateBranchFromLabel(labelName string) {
 	if d.hasBranch(branchName) {
 		return
 	}
-	version := prefix.NewBranchParser(branchName).MustParse()
+	rawMappedVersion := prefix.NewBranchParser(branchName).MustParse()
 
-	clib, _ := mappedversion.From(version).MustParse()
+	clib, _ := mappedversion.From(rawMappedVersion).MustParse()
 	// slow-path: check the condition if we can create a branch
 	//
 	// create a branch only when this version is legacy.
 	// according to branch maintenance strategy
 
 	// get latest version of the clib
-	ver := versions.Read("llpkgstore.json")
+	ver := mappingtable.Read("llpkgstore.json")
 
 	cversions := ver.CVersions(clib)
 	if len(cversions) == 0 {
 		panic("no clib found")
 	}
 
-	if !versions.IsSemver(cversions) {
+	if !version.IsSemver(cversions) {
 		panic("c version dones't follow semver, skip maintaining.")
 	}
 
-	err := d.createBranch(branchName, tag.From(version).SHA())
+	err := d.createBranch(branchName, tag.From(rawMappedVersion).SHA())
 	must(err)
 }
 
@@ -377,13 +376,13 @@ func (d *DefaultClient) removeLabel(labelName string) {
 
 // checkMappedVersion validates PR contains valid "Release-as" version declaration
 func (d *DefaultClient) checkMappedVersion(packageName string) mappedversion.MappedVersion {
-	matchMappedVersion := regex(packageName)
+	mappedVersionRegex := compileCommitVersionRegexByName(packageName)
 
 	var rawMappedVersion string
 
 	for _, commit := range d.currentPRCommit() {
 		message := commit.GetCommit().GetMessage()
-		if rawMappedVersion = matchMappedVersion.FindString(message); rawMappedVersion != "" {
+		if rawMappedVersion = mappedVersionRegex.FindString(message); rawMappedVersion != "" {
 			// remove space, of course
 			rawMappedVersion = strings.TrimSpace(rawMappedVersion)
 			break
@@ -408,12 +407,12 @@ func (d *DefaultClient) commitMessage(sha string) *github.RepositoryCommit {
 }
 
 // mappedVersion parses the latest commit's mapped version from "Release-as" directive
-func (d *DefaultClient) mappedVersion() string {
+func (d *DefaultClient) retrieveMappedVersion() string {
 	// get message
 	message := d.commitMessage(env.LatestCommitSHA()).GetCommit().GetMessage()
 
 	// parse the mapped version
-	commitVersion := regex(".*").FindString(message)
+	commitVersion := compileCommitVersionRegexByName(".*").FindString(message)
 	// mapped version not found, a normal commit?
 	if commitVersion == "" {
 		return ""
@@ -557,7 +556,7 @@ func (d *DefaultClient) removeBranch(branchName string) error {
 }
 
 // checkVersion performs version validation and configuration checks
-func (d *DefaultClient) checkVersion(ver *versions.Versions, cfg config.LLPkgConfig) {
+func (d *DefaultClient) checkVersion(ver *mappingtable.Versions, cfg config.LLPkgConfig) {
 	// 4. Check MappedVersion
 	version := d.checkMappedVersion(cfg.Upstream.Package.Name)
 	_, mappedVersion := version.MustParse()

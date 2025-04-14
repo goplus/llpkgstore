@@ -13,8 +13,9 @@ import (
 	"sync"
 
 	"github.com/goplus/llpkgstore/config"
+	"github.com/goplus/llpkgstore/internal/actions/mappingtable"
 	"github.com/goplus/llpkgstore/internal/actions/parser/prefix"
-	"github.com/goplus/llpkgstore/internal/actions/versions"
+	"github.com/goplus/llpkgstore/internal/actions/version"
 	"golang.org/x/mod/semver"
 )
 
@@ -97,19 +98,19 @@ func IssueEvent() map[string]any {
 
 // checkLegacyVersion validates versioning strategy for legacy package submissions
 // Ensures semantic versioning compliance and proper branch maintenance strategy
-func checkLegacyVersion(ver *versions.Versions, cfg config.LLPkgConfig, mappedVersion string, isLegacy bool) {
+func checkLegacyVersion(ver *mappingtable.Versions, cfg config.LLPkgConfig, mappedVersion string, isLegacy bool) {
 	if slices.Contains(ver.GoVersions(cfg.Upstream.Package.Name), mappedVersion) {
 		log.Fatalf("repeat semver: %s", mappedVersion)
 	}
 	vers := ver.CVersions(cfg.Upstream.Package.Name)
-	currentVersion := versions.ToSemVer(cfg.Upstream.Package.Version)
+	currentVersion := version.ToSemVer(cfg.Upstream.Package.Version)
 
 	// skip when we're the only latest version or C version doesn't follow semver.
 	if len(vers) == 0 || !semver.IsValid(currentVersion) {
 		return
 	}
 
-	sort.Sort(versions.ByVersionDescending(vers))
+	sort.Sort(version.ByVersionDescending(vers))
 
 	latestVersion := vers[0]
 

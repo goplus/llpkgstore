@@ -1,4 +1,4 @@
-package versions
+package mappingtable
 
 import (
 	"encoding/json"
@@ -7,6 +7,7 @@ import (
 	"os"
 	"slices"
 
+	"github.com/goplus/llpkgstore/internal/actions/version"
 	"github.com/goplus/llpkgstore/metadata"
 	"golang.org/x/mod/semver"
 )
@@ -69,8 +70,8 @@ func (v *Versions) CVersions(clib string) (ret []string) {
 	if versions == nil {
 		return
 	}
-	for version := range versions.Versions {
-		ret = append(ret, ToSemVer(version))
+	for cversion := range versions.Versions {
+		ret = append(ret, version.ToSemVer(cversion))
 	}
 	return
 }
@@ -99,9 +100,9 @@ func (v *Versions) LatestGoVersionForCVersion(clib, cver string) string {
 
 // SearchBySemVer looks up a C library version by its semantic version string.
 func (v *Versions) SearchBySemVer(clib, semver string) string {
-	for version := range v.cVersions(clib) {
-		if ToSemVer(version) == semver {
-			return version
+	for cversion := range v.cVersions(clib) {
+		if version.ToSemVer(cversion) == semver {
+			return cversion
 		}
 	}
 	return ""

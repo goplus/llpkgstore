@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	"github.com/goplus/llpkgstore/config"
-	"github.com/goplus/llpkgstore/internal/actions/versions"
+	"github.com/goplus/llpkgstore/internal/actions/mappingtable"
 )
 
 func recoverFn(branchName string, fn func(legacy bool)) (ret any) {
@@ -42,7 +42,7 @@ func TestLegacyVersion1(t *testing.T) {
 	defer os.Remove(".llpkgstore.json")
 
 	cfg, _ := config.ParseLLPkgConfig(".llpkg.cfg")
-	ver := versions.Read(".llpkgstore.json")
+	ver := mappingtable.Read(".llpkgstore.json")
 
 	err := recoverFn("main", func(legacy bool) {
 		checkLegacyVersion(ver, cfg, "v0.1.1", legacy)
@@ -83,7 +83,7 @@ func TestLegacyVersion2(t *testing.T) {
 	defer os.Remove(".llpkgstore.json")
 
 	cfg, _ := config.ParseLLPkgConfig(".llpkg.cfg")
-	ver := versions.Read(".llpkgstore.json")
+	ver := mappingtable.Read(".llpkgstore.json")
 
 	err := recoverFn("release-branch.cjson/v0.1.1", func(legacy bool) {
 		checkLegacyVersion(ver, cfg, "v0.1.2", legacy)
@@ -122,7 +122,7 @@ func TestLegacyVersion3(t *testing.T) {
 	defer os.Remove(".llpkgstore.json")
 
 	cfg, _ := config.ParseLLPkgConfig(".llpkg.cfg")
-	ver := versions.Read(".llpkgstore.json")
+	ver := mappingtable.Read(".llpkgstore.json")
 
 	err := recoverFn("main", func(legacy bool) {
 		checkLegacyVersion(ver, cfg, "v0.3.0", legacy)
@@ -161,7 +161,7 @@ func TestLegacyVersion4(t *testing.T) {
 	defer os.Remove(".llpkgstore.json")
 
 	cfg, _ := config.ParseLLPkgConfig(".llpkg.cfg")
-	ver := versions.Read(".llpkgstore.json")
+	ver := mappingtable.Read(".llpkgstore.json")
 
 	err := recoverFn("main", func(legacy bool) {
 		checkLegacyVersion(ver, cfg, "v0.0.1", legacy)
@@ -201,7 +201,7 @@ func TestLegacyVersion5(t *testing.T) {
 	defer os.Remove(".llpkgstore.json")
 
 	cfg, _ := config.ParseLLPkgConfig(".llpkg.cfg")
-	ver := versions.Read(".llpkgstore.json")
+	ver := mappingtable.Read(".llpkgstore.json")
 
 	err := recoverFn("main", func(legacy bool) {
 		checkLegacyVersion(ver, cfg, "v0.1.1", legacy)
