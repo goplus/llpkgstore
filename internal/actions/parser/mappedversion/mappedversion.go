@@ -7,13 +7,15 @@ import (
 	"golang.org/x/mod/semver"
 )
 
-var (
-	ErrVersionFormat       = errors.New("invalid mapped version format")
-	ErrMappedVersionFormat = errors.New("invalid mapped version format: mappedVersion is not a semver")
-)
+// ErrVersionFormat invalid version format error
+var ErrVersionFormat = errors.New("invalid mapped version format")
+
+// ErrMappedVersionFormat invalid semantic version error
+var ErrMappedVersionFormat = errors.New("invalid semantic version format")
 
 type MappedVersion string
 
+// From creates a MappedVersion from string
 func From(version string) MappedVersion {
 	return MappedVersion(version)
 }
@@ -21,28 +23,28 @@ func From(version string) MappedVersion {
 // Parse splits the mapped version string into library name and version.
 // Input format: "clib/semver" where semver starts with 'v'
 // Panics if input format is invalid or version isn't valid semantic version
-func (m MappedVersion) Parse() (clib, mappedVersion string, err error) {
-	arr := strings.Split(m.String(), "/")
-	if len(arr) != 2 {
-		err = ErrVersionFormat
-		return
+func (m MappedVersion) Parse() (clib, version string, err error) {
+	parts := strings.Split(string(m), "/")
+	if len(parts) != 2 {
+		return "", "", ErrVersionFormat
 	}
-	clib, mappedVersion = arr[0], arr[1]
-
-	if !semver.IsValid(mappedVersion) {
-		err = ErrVersionFormat
+	clib, version = parts[0], parts[1]
+	if !semver.IsValid(version) {
+		return "", "", ErrMappedVersionFormat
 	}
 	return
 }
 
-func (m MappedVersion) MustParse() (clib, mappedVersion string) {
-	clib, mappedVersion, err := m.Parse()
+// MustParse parses version or panics
+func (m MappedVersion) MustParse() (string, string) {
+	clib, ver, err := m.Parse()
 	if err != nil {
 		panic(err)
 	}
-	return
+	return clib, ver
 }
 
+// String returns the version string representation
 func (m MappedVersion) String() string {
 	return string(m)
 }

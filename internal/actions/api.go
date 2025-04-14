@@ -100,8 +100,8 @@ func (d *DefaultClient) CheckPR() []string {
 	return allPaths
 }
 
-// Postprocessing handles version tagging and record updates after PR merge
-// Creates Git tags, updates version records, and cleans up legacy branches
+// Postprocessing handles version tagging and record updates after PR merge. This MUST be called after the Release function.
+// Functions include creating Git tags, updating version records in llpkgstore.json, and cleaning up legacy branches.
 func (d *DefaultClient) Postprocessing() {
 	// https://docs.github.com/en/actions/writing-workflows/choosing-when-your-workflow-runs/events-that-trigger-workflows#push
 	sha := env.LatestCommitSHA()
@@ -111,7 +111,7 @@ func (d *DefaultClient) Postprocessing() {
 		panic("not a merge request commit")
 	}
 
-	rawMappedVersion := d.retrieveMappedVersion()
+	rawMappedVersion := d.findRawMappedVersion()
 	// skip it when no mapped version is found
 	if rawMappedVersion == "" {
 		panic("no mapped version found in the commit message")
@@ -149,14 +149,16 @@ func (d *DefaultClient) Postprocessing() {
 	// move to website in Github Action...
 }
 
+// Release prepares and uploads package artifacts for distribution. THIS FUNCTION MUST BE CALLED BEFORE Postprocessing.
+// It generates package configuration files, creates a ZIP artifact, and sets environment variables for subsequent steps.
 func (d *DefaultClient) Release() {
-	version := d.retrieveMappedVersion()
+	rawMappedVersion := d.findRawMappedVersion()
 	// skip it when no mapped version is found
-	if version == "" {
+	if rawMappedVersion == "" {
 		panic("no mapped version found in the commit message")
 	}
 
-	clib, _ := mappedversion.From(version).MustParse()
+	clib, _ := mappedversion.From(rawMappedVersion).MustParse()
 	// the pr has merged, so we can read it.
 	cfg, err := config.ParseLLPkgConfig(filepath.Join(clib, "llpkg.cfg"))
 	must(err)
@@ -406,8 +408,8 @@ func (d *DefaultClient) commitMessage(sha string) *github.RepositoryCommit {
 	return commit
 }
 
-// mappedVersion parses the latest commit's mapped version from "Release-as" directive
-func (d *DefaultClient) retrieveMappedVersion() string {
+// mappedVersion finds raw mapped version from the latest commit
+func (d *DefaultClient) findRawMappedVersion() string {
 	// get message
 	message := d.commitMessage(env.LatestCommitSHA()).GetCommit().GetMessage()
 
@@ -455,6 +457,9 @@ func (d *DefaultClient) createBranch(branchName, sha string) error {
 	return err
 }
 
+// createReleaseByTag creates a GitHub release using the specified tag.
+// It uses the default branch (_defaultReleaseBranch) as the target commitish.
+// The 'makeLatest' flag is set to "true" for non-legacy versions and "legacy" otherwise.
 func (d *DefaultClient) createReleaseByTag(tag string) *github.RepositoryRelease {
 	ctx, cancel := context.WithTimeout(context.TODO(), 30*time.Second)
 	defer cancel()
@@ -479,6 +484,7 @@ func (d *DefaultClient) createReleaseByTag(tag string) *github.RepositoryRelease
 	return release
 }
 
+// uploadToRelease uploads a file to a GitHub release.
 func (d *DefaultClient) uploadToRelease(fileName string, size int64, reader io.Reader, release *github.RepositoryRelease) {
 	ctx, cancel := context.WithTimeout(context.TODO(), 30*time.Second)
 	defer cancel()
@@ -493,6 +499,7 @@ func (d *DefaultClient) uploadToRelease(fileName string, size int64, reader io.R
 	must(err)
 }
 
+// uploadArtifactToRelease uploads a single artifact to a GitHub release in a goroutine.
 func (d *DefaultClient) uploadArtifactToRelease(wg *sync.WaitGroup, artifactID int64, release *github.RepositoryRelease) {
 	ctx, cancel := context.WithTimeout(context.TODO(), 30*time.Second)
 	defer wg.Done()
@@ -523,6 +530,7 @@ func (d *DefaultClient) uploadArtifactToRelease(wg *sync.WaitGroup, artifactID i
 	d.uploadToRelease(fileName, resp.ContentLength, resp.Body, release)
 }
 
+// uploadArtifactsToRelease uploads all available workflow artifacts to the specified GitHub release.
 func (d *DefaultClient) uploadArtifactsToRelease(release *github.RepositoryRelease) (files []*os.File) {
 	ctx, cancel := context.WithTimeout(context.TODO(), 30*time.Second)
 	defer cancel()
