@@ -554,6 +554,7 @@ func (d *DefaultClient) Postprocessing() {
 	// move to website in Github Action...
 }
 
+// Release must be called before Postprocessing
 func (d *DefaultClient) Release() {
 	version := d.mappedVersion()
 	// skip it when no mapped version is found
