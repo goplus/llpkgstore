@@ -147,6 +147,10 @@ func (v *Versions) String() string {
 	return string(b)
 }
 
+// initCVersion initializes the C library version entry in metadata if it doesn't exist
+// Parameters:
+//
+//	clib: The name of the C library
 func (v *Versions) initCVersion(clib string) {
 	clibVersions := v.m[clib]
 	if clibVersions == nil {
@@ -157,12 +161,21 @@ func (v *Versions) initCVersion(clib string) {
 	}
 }
 
+// goVersion retrieves Go versions associated with specific C library version
+// Parameters:
+//
+//	clib: The C library name
+//	clibVersion: The C library version
+//
+// Returns:
+//
+//	Slice of Go versions compatible with given C library version
 func (v *Versions) goVersion(clib, clibVersion string) []metadata.GoVersion {
 	clibVersions := v.m[clib]
 	if clibVersions == nil {
 		return nil
 	}
-	return append([]metadata.GoVersion{}, clibVersions.Versions[clibVersion]...)
+	return slices.Clone(clibVersions.Versions[clibVersion])
 }
 
 // cVersions retrieves the version mappings for a specific C library.
