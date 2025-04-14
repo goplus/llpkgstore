@@ -28,7 +28,7 @@ type Versions struct {
 //	elem: Version to append
 func appendVersion(arr []string, elem string) []string {
 	if slices.Contains(arr, elem) {
-		log.Fatalf("version %s has already existed", elem)
+		log.Panicf("version %s has already existed", elem)
 	}
 	return append(arr, elem)
 }

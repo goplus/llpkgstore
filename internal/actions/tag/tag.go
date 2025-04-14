@@ -17,7 +17,7 @@ func From(tag string) Tag {
 func (t Tag) SHA() string {
 	ret, err := exec.Command("git", "rev-list", "-n", "1", t.String()).CombinedOutput()
 	if err != nil {
-		log.Fatalf("cannot find a tag: %s %s", t, string(ret))
+		log.Panicf("cannot find a tag: %s %s", t, string(ret))
 	}
 	return strings.TrimSpace(string(ret))
 }

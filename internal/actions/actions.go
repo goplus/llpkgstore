@@ -100,7 +100,7 @@ func IssueEvent() map[string]any {
 // Ensures semantic versioning compliance and proper branch maintenance strategy
 func checkLegacyVersion(ver *mappingtable.Versions, cfg config.LLPkgConfig, mappedVersion string, isLegacy bool) {
 	if slices.Contains(ver.GoVersions(cfg.Upstream.Package.Name), mappedVersion) {
-		log.Fatalf("repeat semver: %s", mappedVersion)
+		log.Panicf("repeat semver: %s", mappedVersion)
 	}
 	vers := ver.CVersions(cfg.Upstream.Package.Name)
 	currentVersion := version.ToSemVer(cfg.Upstream.Package.Version)
