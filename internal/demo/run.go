@@ -13,7 +13,7 @@
 * See the License for the specific language governing permissions and
 * limitations under the License.
  */
-package internal
+package demo
 
 import (
 	"fmt"
@@ -24,7 +24,7 @@ import (
 	"github.com/goplus/llpkgstore/internal/pc"
 )
 
-func RunGenPkgDemo(demoRoot string) {
+func runDemo(demoRoot string) {
 	demosPath := filepath.Join(demoRoot, "_demo")
 
 	fmt.Printf("testing demos in %s\n", demosPath)
@@ -44,10 +44,10 @@ func RunGenPkgDemo(demoRoot string) {
 	}
 }
 
-func RunAllGenPkgDemos(baseDir string) {
+func Run(baseDir string) {
 	fmt.Printf("Starting generated package tests in directory: %s\n", baseDir)
 	absDir, _ := filepath.Abs(baseDir)
-	RunGenPkgDemo(absDir)
+	runDemo(absDir)
 }
 
 func runCommand(pcPath, dir, command string, args ...string) error {
