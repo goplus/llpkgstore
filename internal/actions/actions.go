@@ -274,7 +274,7 @@ func LatestCommitSHA() string {
 	return sha
 }
 
-func WorkflowID() int64 {
+func WorkflowRunID() int64 {
 	runId := os.Getenv("GITHUB_RUN_ID")
 	if runId == "" {
 		panic("no GITHUB_RUN_ID found")

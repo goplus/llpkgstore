@@ -364,9 +364,8 @@ func (d *DefaultClient) uploadToRelease(fileName string, size int64, reader io.R
 	must(err)
 }
 
-func (d *DefaultClient) uploadArtifact(wg *sync.WaitGroup, artifactID int64, release *github.RepositoryRelease) {
+func (d *DefaultClient) uploadArtifact(artifactID int64, release *github.RepositoryRelease) {
 	ctx, cancel := context.WithTimeout(context.TODO(), 30*time.Second)
-	defer wg.Done()
 	defer cancel()
 
 	url, _, err := d.client.Actions.DownloadArtifact(ctx, d.owner, d.repo,
@@ -399,7 +398,7 @@ func (d *DefaultClient) uploadArtifactsToRelease(release *github.RepositoryRelea
 	defer cancel()
 
 	artifacts, _, err := d.client.Actions.ListWorkflowRunArtifacts(ctx, d.owner, d.repo,
-		WorkflowID(), &github.ListOptions{})
+		WorkflowRunID(), &github.ListOptions{})
 
 	must(err)
 
@@ -410,7 +409,12 @@ func (d *DefaultClient) uploadArtifactsToRelease(release *github.RepositoryRelea
 	var wg sync.WaitGroup
 	wg.Add(len(artifacts.Artifacts))
 	for _, artifact := range artifacts.Artifacts {
-		go d.uploadArtifact(&wg, artifact.GetID(), release)
+		// make a copy to avoid for loop bug
+		artifactID := artifact.GetID()
+		go func() {
+			d.uploadArtifact(artifactID, release)
+			wg.Done()
+		}()
 	}
 	wg.Wait()
 	return
@@ -594,7 +598,8 @@ func (d *DefaultClient) Release() {
 	file.RemovePattern(filepath.Join(tempDir, "*.sh"))
 
 	zipFilename := binaryZip(uc.Pkg.Name)
-	zipFilePath, _ := filepath.Abs(zipFilename)
+	zipFilePath, err := filepath.Abs(zipFilename)
+	must(err)
 
 	err = file.Zip(tempDir, zipFilePath)
 	must(err)
