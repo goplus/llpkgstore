@@ -10,6 +10,7 @@ import (
 	"runtime"
 	"slices"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 
@@ -271,4 +272,14 @@ func LatestCommitSHA() string {
 		panic("no GITHUB_SHA found")
 	}
 	return sha
+}
+
+func WorkflowRunID() int64 {
+	runId := os.Getenv("GITHUB_RUN_ID")
+	if runId == "" {
+		panic("no GITHUB_RUN_ID found")
+	}
+	id, err := strconv.ParseInt(runId, 10, 64)
+	must(err)
+	return id
 }
