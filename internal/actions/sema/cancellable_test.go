@@ -66,10 +66,10 @@ func TestCancellableGroup(t *testing.T) {
 		for _, x := range inputTest {
 			x := x
 			g.Go(func() error {
-				defer cnt.Add(1)
 				if x == "a" {
 					return errors.New(x)
 				}
+				cnt.Add(1)
 				return nil
 			})
 		}
@@ -94,10 +94,10 @@ func TestCancellableGroup(t *testing.T) {
 		for _, x := range inputTest {
 			x := x
 			g.Go(func() error {
-				defer cnt.Add(1)
 				if x == "a" || x == "c" {
 					return errors.New(x)
 				}
+				cnt.Add(1)
 				return nil
 			})
 		}
