@@ -26,12 +26,8 @@ func TestHasTag(t *testing.T) {
 	}
 }
 
-func recoverFn(branchName string, fn func(legacy bool)) (ret any) {
-	defer func() {
-		ret = recover()
-	}()
-	fn(strings.HasPrefix(branchName, BranchPrefix))
-	return
+func actionFn(branchName string, fn func(legacy bool) error) error {
+	return fn(strings.HasPrefix(branchName, BranchPrefix))
 }
 
 func TestLegacyVersion1(t *testing.T) {
@@ -62,13 +58,11 @@ func TestLegacyVersion1(t *testing.T) {
 	cfg, _ := config.ParseLLPkgConfig(".llpkg.cfg")
 	ver := versions.Read(".llpkgstore.json")
 
-	err := recoverFn("main", func(legacy bool) {
-		checkLegacyVersion(ver, cfg, "v0.1.1", legacy)
+	err := actionFn("main", func(legacy bool) error {
+		return checkLegacyVersion(ver, cfg, "v0.1.1", legacy)
 	})
-	_, ok := err.(string)
-	isValid := ok && err != ""
 
-	if !isValid {
+	if err == nil {
 		t.Errorf("unexpected behavior: %v", err)
 		return
 	}
@@ -103,8 +97,8 @@ func TestLegacyVersion2(t *testing.T) {
 	cfg, _ := config.ParseLLPkgConfig(".llpkg.cfg")
 	ver := versions.Read(".llpkgstore.json")
 
-	err := recoverFn("release-branch.cjson/v0.1.1", func(legacy bool) {
-		checkLegacyVersion(ver, cfg, "v0.1.2", legacy)
+	err := actionFn("release-branch.cjson/v0.1.1", func(legacy bool) error {
+		return checkLegacyVersion(ver, cfg, "v0.1.2", legacy)
 	})
 	isValid := err == nil
 
@@ -142,8 +136,8 @@ func TestLegacyVersion3(t *testing.T) {
 	cfg, _ := config.ParseLLPkgConfig(".llpkg.cfg")
 	ver := versions.Read(".llpkgstore.json")
 
-	err := recoverFn("main", func(legacy bool) {
-		checkLegacyVersion(ver, cfg, "v0.3.0", legacy)
+	err := actionFn("main", func(legacy bool) error {
+		return checkLegacyVersion(ver, cfg, "v0.3.0", legacy)
 	})
 	isValid := err == nil
 
@@ -181,13 +175,11 @@ func TestLegacyVersion4(t *testing.T) {
 	cfg, _ := config.ParseLLPkgConfig(".llpkg.cfg")
 	ver := versions.Read(".llpkgstore.json")
 
-	err := recoverFn("main", func(legacy bool) {
-		checkLegacyVersion(ver, cfg, "v0.0.1", legacy)
+	err := actionFn("main", func(legacy bool) error {
+		return checkLegacyVersion(ver, cfg, "v0.0.1", legacy)
 	})
-	_, ok := err.(string)
-	isValid := ok && err != ""
 
-	if !isValid {
+	if err == nil {
 		t.Errorf("unexpected behavior: %v", err)
 		return
 	}
@@ -221,13 +213,11 @@ func TestLegacyVersion5(t *testing.T) {
 	cfg, _ := config.ParseLLPkgConfig(".llpkg.cfg")
 	ver := versions.Read(".llpkgstore.json")
 
-	err := recoverFn("main", func(legacy bool) {
-		checkLegacyVersion(ver, cfg, "v0.1.1", legacy)
+	err := actionFn("main", func(legacy bool) error {
+		return checkLegacyVersion(ver, cfg, "v0.1.1", legacy)
 	})
-	_, ok := err.(string)
-	isValid := ok && err != ""
 
-	if !isValid {
+	if err == nil {
 		t.Errorf("unexpected behavior: %v", err)
 		return
 	}
