@@ -3,6 +3,7 @@ package actions
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"mime"
@@ -11,7 +12,6 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/google/go-github/v69/github"
@@ -67,12 +67,20 @@ type DefaultClient struct {
 // Returns:
 //
 //	*DefaultClient: Configured client instance
-func NewDefaultClient() *DefaultClient {
-	dc := &DefaultClient{
-		client: github.NewClient(nil).WithAuthToken(env.Token()),
+func NewDefaultClient() (*DefaultClient, error) {
+	token, err := env.Token()
+	if err != nil {
+		return nil, err
 	}
-	dc.owner, dc.repo = env.Repository()
-	return dc
+	owner, repo, err := env.Repository()
+	if err != nil {
+		return nil, err
+	}
+	dc := &DefaultClient{
+		owner: owner, repo: repo,
+		client: github.NewClient(nil).WithAuthToken(token),
+	}
+	return dc, nil
 }
 
 // hasBranch checks existence of a specific branch in the repository
@@ -103,15 +111,17 @@ func (d *DefaultClient) hasBranch(branchName string) bool {
 // Returns:
 //
 //	[]*github.PullRequest: List of associated pull requests
-func (d *DefaultClient) associatedWithPullRequest(sha string) []*github.PullRequest {
+func (d *DefaultClient) associatedWithPullRequest(sha string) ([]*github.PullRequest, error) {
 	ctx, cancel := context.WithTimeout(context.TODO(), 30*time.Second)
 	defer cancel()
 
 	pulls, _, err := d.client.PullRequests.ListPullRequestsWithCommit(
 		ctx, d.owner, d.repo, sha, &github.ListOptions{},
 	)
-	must(err)
-	return pulls
+	if err != nil {
+		return nil, wrapActionError(err)
+	}
+	return pulls, nil
 }
 
 // isAssociatedWithPullRequest checks if commit belongs to a closed pull request
@@ -123,7 +133,7 @@ func (d *DefaultClient) associatedWithPullRequest(sha string) []*github.PullRequ
 //
 //	bool: True if part of closed PR
 func (d *DefaultClient) isAssociatedWithPullRequest(sha string) bool {
-	pulls := d.associatedWithPullRequest(sha)
+	pulls, _ := d.associatedWithPullRequest(sha)
 	// don't use GetMerge, because GetMerge may be a mistake.
 	// sometime, when a pull request is merged, GetMerge still returns false.
 	// so checking pull request state is more accurate.
@@ -136,14 +146,20 @@ func (d *DefaultClient) isAssociatedWithPullRequest(sha string) bool {
 //
 //	branchName: Base branch name
 //	legacy: True if branch starts with "release-branch."
-func (d *DefaultClient) isLegacyVersion() (branchName string, legacy bool) {
+func (d *DefaultClient) isLegacyVersion() (branchName string, legacy bool, err error) {
 	pullRequest, ok := GitHubEvent()["pull_request"].(map[string]any)
 	var refName string
 	if !ok {
+		var sha string
+		var pulls []*github.PullRequest
+		sha, err = env.LatestCommitSHA()
+		if err != nil {
+			return
+		}
 		// if this actions is not triggered by pull request, fallback to call API.
-		pulls := d.associatedWithPullRequest(env.LatestCommitSHA())
-		if len(pulls) == 0 {
-			panic("this commit is not associated with a pull request, this should not happen")
+		pulls, err = d.associatedWithPullRequest(sha)
+		if err != nil {
+			return
 		}
 		refName = pulls[0].GetBase().GetRef()
 	} else {
@@ -161,7 +177,7 @@ func (d *DefaultClient) isLegacyVersion() (branchName string, legacy bool) {
 // Returns:
 //
 //	[]*github.RepositoryCommit: List of PR commits
-func (d *DefaultClient) currentPRCommit() []*github.RepositoryCommit {
+func (d *DefaultClient) currentPRCommit() ([]*github.RepositoryCommit, error) {
 	pullRequest := PullRequestEvent()
 	prNumber := int(pullRequest["number"].(float64))
 
@@ -172,15 +188,17 @@ func (d *DefaultClient) currentPRCommit() []*github.RepositoryCommit {
 		ctx, d.owner, d.repo, prNumber,
 		&github.ListOptions{},
 	)
-	must(err)
-	return commits
+	if err != nil {
+		return nil, wrapActionError(err)
+	}
+	return commits, nil
 }
 
 // allCommits retrieves all repository commits
 // Returns:
 //
 //	[]*github.RepositoryCommit: List of all commits
-func (d *DefaultClient) allCommits() []*github.RepositoryCommit {
+func (d *DefaultClient) allCommits() ([]*github.RepositoryCommit, error) {
 	ctx, cancel := context.WithTimeout(context.TODO(), 30*time.Second)
 	defer cancel()
 	// use authorized API to avoid Github RateLimit
@@ -188,22 +206,24 @@ func (d *DefaultClient) allCommits() []*github.RepositoryCommit {
 		ctx, d.owner, d.repo,
 		&github.CommitsListOptions{},
 	)
-	must(err)
-	return commits
+	if err != nil {
+		return nil, wrapActionError(err)
+	}
+	return commits, nil
 }
 
 // removeLabel deletes a label from the repository
 // Parameters:
 //
 //	labelName: Name of the label to remove
-func (d *DefaultClient) removeLabel(labelName string) {
+func (d *DefaultClient) removeLabel(labelName string) error {
 	ctx, cancel := context.WithTimeout(context.TODO(), 30*time.Second)
 	defer cancel()
 	// use authorized API to avoid Github RateLimit
 	_, err := d.client.Issues.DeleteLabel(
 		ctx, d.owner, d.repo, labelName,
 	)
-	must(err)
+	return wrapActionError(err)
 }
 
 // checkMappedVersion validates PR contains valid "Release-as" version declaration
@@ -218,10 +238,14 @@ func (d *DefaultClient) removeLabel(labelName string) {
 // Panics:
 //
 //	If no valid version found in PR commits
-func (d *DefaultClient) checkMappedVersion(packageName string) (mappedVersion string) {
+func (d *DefaultClient) checkMappedVersion(packageName string) (mappedVersion string, err error) {
 	matchMappedVersion := regex(packageName)
 
-	for _, commit := range d.currentPRCommit() {
+	allCommits, err := d.currentPRCommit()
+	if err != nil {
+		return
+	}
+	for _, commit := range allCommits {
 		message := commit.GetCommit().GetMessage()
 		if mappedVersion = matchMappedVersion.FindString(message); mappedVersion != "" {
 			// remove space, of course
@@ -231,7 +255,7 @@ func (d *DefaultClient) checkMappedVersion(packageName string) (mappedVersion st
 	}
 
 	if mappedVersion == "" {
-		panic("no MappedVersion found in the PR")
+		err = ErrNoMappedVersion
 	}
 	return
 }
@@ -244,13 +268,15 @@ func (d *DefaultClient) checkMappedVersion(packageName string) (mappedVersion st
 // Returns:
 //
 //	*github.RepositoryCommit: Commit details object
-func (d *DefaultClient) commitMessage(sha string) *github.RepositoryCommit {
+func (d *DefaultClient) commitMessage(sha string) (*github.RepositoryCommit, error) {
 	ctx, cancel := context.WithTimeout(context.TODO(), 30*time.Second)
 	defer cancel()
 
 	commit, _, err := d.client.Repositories.GetCommit(ctx, d.owner, d.repo, sha, &github.ListOptions{})
-	must(err)
-	return commit
+	if err != nil {
+		return nil, wrapActionError(err)
+	}
+	return commit, nil
 }
 
 // mappedVersion parses the latest commit's mapped version from "Release-as" directive
@@ -261,21 +287,27 @@ func (d *DefaultClient) commitMessage(sha string) *github.RepositoryCommit {
 // Panics:
 //
 //	If version format is invalid
-func (d *DefaultClient) mappedVersion() string {
+func (d *DefaultClient) mappedVersion() (string, error) {
+	sha, err := env.LatestCommitSHA()
+	if err != nil {
+		return "", err
+	}
 	// get message
-	message := d.commitMessage(env.LatestCommitSHA()).GetCommit().GetMessage()
+	commit, err := d.commitMessage(sha)
+
+	message := commit.GetCommit().GetMessage()
 
 	// parse the mapped version
 	mappedVersion := regex(".*").FindString(message)
 	// mapped version not found, a normal commit?
 	if mappedVersion == "" {
-		return ""
+		return "", ErrNoMappedVersion
 	}
 	version := strings.TrimPrefix(mappedVersion, MappedVersionPrefix)
 	if version == mappedVersion {
 		panic("invalid format")
 	}
-	return strings.TrimSpace(version)
+	return strings.TrimSpace(version), nil
 }
 
 // createTag creates a new Git tag pointing to specific commit
@@ -300,7 +332,7 @@ func (d *DefaultClient) createTag(tag, sha string) error {
 		},
 	})
 
-	return err
+	return wrapActionError(err)
 }
 
 // createBranch creates a new branch pointing to specific commit
@@ -324,17 +356,22 @@ func (d *DefaultClient) createBranch(branchName, sha string) error {
 		},
 	})
 
-	return err
+	return wrapActionError(err)
 }
 
-func (d *DefaultClient) createReleaseByTag(tag string) *github.RepositoryRelease {
+func (d *DefaultClient) createReleaseByTag(tag string) (*github.RepositoryRelease, error) {
 	ctx, cancel := context.WithTimeout(context.TODO(), 30*time.Second)
 	defer cancel()
 
 	branch := defaultReleaseBranch
 
+	_, isLegacy, err := d.isLegacyVersion()
+	if err != nil {
+		return nil, err
+	}
+
 	makeLatest := "true"
-	if _, isLegacy := d.isLegacyVersion(); isLegacy {
+	if isLegacy {
 		makeLatest = "legacy"
 	}
 	generateRelease := true
@@ -346,79 +383,117 @@ func (d *DefaultClient) createReleaseByTag(tag string) *github.RepositoryRelease
 		MakeLatest:           &makeLatest,
 		GenerateReleaseNotes: &generateRelease,
 	})
-	must(err)
+	if err != nil {
+		return nil, wrapActionError(err)
+	}
 
-	return release
+	return release, nil
 }
 
-func (d *DefaultClient) uploadToRelease(fileName string, size int64, reader io.Reader, release *github.RepositoryRelease) {
+func (d *DefaultClient) uploadToRelease(
+	fileName string,
+	size int64,
+	reader io.Reader,
+	release *github.RepositoryRelease,
+) error {
 	ctx, cancel := context.WithTimeout(context.TODO(), 30*time.Second)
 	defer cancel()
 
 	url := fmt.Sprintf("repos/%s/%s/releases/%d/assets?name=%s", d.owner, d.repo, release.GetID(), fileName)
 
 	req, err := d.client.NewUploadRequest(url, reader, size, "application/zip")
-	must(err)
+	if err != nil {
+		return wrapActionError(err)
+	}
 
 	asset := new(github.ReleaseAsset)
 	_, err = d.client.Do(ctx, req, asset)
-	must(err)
+	if err != nil {
+		return wrapActionError(err)
+	}
+	return nil
 }
 
-func (d *DefaultClient) uploadArtifact(artifactID int64, release *github.RepositoryRelease) {
+func (d *DefaultClient) uploadArtifact(artifactID int64, release *github.RepositoryRelease) error {
 	ctx, cancel := context.WithTimeout(context.TODO(), 30*time.Second)
 	defer cancel()
 
 	url, _, err := d.client.Actions.DownloadArtifact(ctx, d.owner, d.repo,
 		artifactID, 0)
 
-	must(err)
+	if err != nil {
+		return wrapActionError(err)
+	}
 
 	httpClient := &http.Client{Timeout: 30 * time.Second}
 
 	resp, err := httpClient.Get(url.String())
-	must(err)
+	if err != nil {
+		return wrapActionError(err)
+	}
 	defer resp.Body.Close()
 
 	disposition := resp.Header.Get("Content-Disposition")
 	_, params, err := mime.ParseMediaType(disposition)
-	must(err)
+	if err != nil {
+		return wrapActionError(err)
+	}
 
 	fileName, ok := params["filename"]
 	if !ok {
-		panic("no filename found in Content-Disposition")
+		return errors.New("actions: no filename found in Content-Disposition")
 	}
 
 	fmt.Printf("Upload %s to %s\n", fileName, release.GetName())
 
-	d.uploadToRelease(fileName, resp.ContentLength, resp.Body, release)
+	return d.uploadToRelease(fileName, resp.ContentLength, resp.Body, release)
 }
 
-func (d *DefaultClient) uploadArtifactsToRelease(release *github.RepositoryRelease) (files []*os.File) {
+func (d *DefaultClient) uploadArtifactsToRelease(release *github.RepositoryRelease) (files []*os.File, err error) {
 	ctx, cancel := context.WithTimeout(context.TODO(), 30*time.Second)
 	defer cancel()
 
+	id, err := env.WorkflowRunID()
 	artifacts, _, err := d.client.Actions.ListWorkflowRunArtifacts(ctx, d.owner, d.repo,
-		env.WorkflowRunID(), &github.ListOptions{})
+		id, &github.ListOptions{})
 
-	must(err)
-
-	if artifacts.GetTotalCount() == 0 {
-		panic("no artifact found")
+	if err != nil {
+		return nil, wrapActionError(err)
 	}
 
-	var wg sync.WaitGroup
-	wg.Add(len(artifacts.Artifacts))
+	if artifacts.GetTotalCount() == 0 {
+		return nil, errors.New("actions: no artifact found")
+	}
+
+	semaCount := len(artifacts.Artifacts)
+	sema := make(chan struct{}, semaCount)
+
+	uploadCtx, uploadCancel := context.WithCancelCause(context.TODO())
 	for _, artifact := range artifacts.Artifacts {
 		// make a copy to avoid for loop bug
 		artifactID := artifact.GetID()
 		go func() {
-			d.uploadArtifact(artifactID, release)
-			wg.Done()
+			err := d.uploadArtifact(artifactID, release)
+			if err != nil {
+				uploadCancel(err)
+				return
+			}
+			sema <- struct{}{}
 		}()
 	}
-	wg.Wait()
-	return
+
+	for {
+		select {
+		case <-sema:
+			semaCount--
+			if semaCount <= 0 {
+				return
+			}
+		case <-uploadCtx.Done():
+			err = uploadCtx.Err()
+			return
+		}
+	}
 }
 
 // removeBranch deletes a branch from the repository
@@ -533,7 +608,8 @@ func (d *DefaultClient) Postprocessing() {
 
 	// the pr has merged, so we can read it.
 	cfg, err := config.ParseLLPkgConfig(filepath.Join(clib, "llpkg.cfg"))
-	must(err)
+	if err != nil {
+	}
 
 	// write it to llpkgstore.json
 	ver := versions.Read("llpkgstore.json")
@@ -570,28 +646,33 @@ func (d *DefaultClient) Release() {
 	clib, _ := parseMappedVersion(version)
 	// the pr has merged, so we can read it.
 	cfg, err := config.ParseLLPkgConfig(filepath.Join(clib, "llpkg.cfg"))
-	must(err)
+	if err != nil {
+	}
 
 	uc, err := config.NewUpstreamFromConfig(cfg.Upstream)
-	must(err)
+	if err != nil {
+	}
 
 	tempDir, _ := os.MkdirTemp("", "llpkg-tool")
 
 	deps, err := uc.Installer.Install(uc.Pkg, tempDir)
-	must(err)
+	if err != nil {
+	}
 
 	pkgConfigDir := filepath.Join(tempDir, "lib", "pkgconfig")
 	// clear exist .pc
 	os.RemoveAll(pkgConfigDir)
 
 	err = os.Mkdir(pkgConfigDir, 0777)
-	must(err)
+	if err != nil {
+	}
 
 	for _, pcName := range deps {
 		pcFile := filepath.Join(tempDir, pcName+".pc")
 		// generate pc template to lib/pkgconfig
 		err = pc.GenerateTemplateFromPC(pcFile, pkgConfigDir, deps)
-		must(err)
+		if err != nil {
+		}
 	}
 
 	// okay, safe to remove old pc
@@ -600,10 +681,12 @@ func (d *DefaultClient) Release() {
 
 	zipFilename := binaryZip(uc.Pkg.Name)
 	zipFilePath, err := filepath.Abs(zipFilename)
-	must(err)
+	if err != nil {
+	}
 
 	err = file.Zip(tempDir, zipFilePath)
-	must(err)
+	if err != nil {
+	}
 
 	// upload to artifacts in GitHub Action
 	// https://github.com/goplus/llpkg/pull/50/files#diff-95373be0ab51a56a2200c8c07981d82e81569f2cd1e4e2946e2002bb66de766fR56-R60
@@ -649,7 +732,8 @@ func (d *DefaultClient) CreateBranchFromLabel(labelName string) {
 	}
 
 	err := d.createBranch(branchName, shaFromTag(version))
-	must(err)
+	if err != nil {
+	}
 }
 
 // CleanResource removes labels and resources after issue resolution

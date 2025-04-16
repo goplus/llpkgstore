@@ -24,13 +24,6 @@ var GitHubEvent = sync.OnceValue(parseGitHubEvent)
 // Feb 12th, this design revoked, still keep the code.
 var currentSuffix = runtime.GOOS + "_" + runtime.GOARCH
 
-// must panics if the error is non-nil, halting execution
-func must(err error) {
-	if err != nil {
-		panic(err)
-	}
-}
-
 // parseGitHubEvent parses the GitHub event payload from GITHUB_EVENT_PATH into a map
 func parseGitHubEvent() map[string]any {
 	eventFileName := os.Getenv("GITHUB_EVENT_PATH")
