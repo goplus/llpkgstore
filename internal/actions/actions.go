@@ -2,6 +2,7 @@ package actions
 
 import (
 	"encoding/json"
+	"fmt"
 	"log"
 	"os"
 	"os/exec"
@@ -13,52 +14,57 @@ import (
 	"sync"
 
 	"github.com/goplus/llpkgstore/config"
+	"github.com/goplus/llpkgstore/internal/actions/env"
 	"github.com/goplus/llpkgstore/internal/actions/versions"
 	"golang.org/x/mod/semver"
 )
 
 // GitHubEvent caches parsed GitHub event data from GITHUB_EVENT_PATH
-var GitHubEvent = sync.OnceValue(parseGitHubEvent)
+var GitHubEvent = sync.OnceValues(parseGitHubEvent)
 
 // In our previous design, each platform should generate *_{OS}_{Arch}.go file
 // Feb 12th, this design revoked, still keep the code.
 var currentSuffix = runtime.GOOS + "_" + runtime.GOARCH
 
 // parseGitHubEvent parses the GitHub event payload from GITHUB_EVENT_PATH into a map
-func parseGitHubEvent() map[string]any {
-	eventFileName := os.Getenv("GITHUB_EVENT_PATH")
-	if eventFileName == "" {
-		panic("cannot get GITHUB_EVENT_PATH")
-	}
-	event, err := os.ReadFile(eventFileName)
+func parseGitHubEvent() (map[string]any, error) {
+	eventFile, err := env.EventFile()
 	if err != nil {
-		panic(err)
+		return nil, err
 	}
 	var m map[string]any
-	json.Unmarshal([]byte(event), &m)
+	err = json.Unmarshal(eventFile, &m)
 
-	if len(m) == 0 {
-		panic("cannot parse GITHUB_EVENT_PATH")
+	if err != nil {
+		return nil, err
 	}
-	return m
+	return m, nil
 }
 
 // PullRequestEvent extracts pull request details from the parsed GitHub event data
-func PullRequestEvent() map[string]any {
-	pullRequest, ok := GitHubEvent()["pull_request"].(map[string]any)
-	if !ok {
-		panic("cannot parse GITHUB_EVENT_PATH pull_request")
+func PullRequestEvent() (map[string]any, error) {
+	event, err := GitHubEvent()
+	if err != nil {
+		return nil, err
 	}
-	return pullRequest
+	pullRequest, ok := event["pull_request"].(map[string]any)
+	if !ok {
+		return nil, fmt.Errorf("env: cannot parse GITHUB_EVENT_PATH pull_request")
+	}
+	return pullRequest, nil
 }
 
 // IssueEvent retrieves issue-related information from the GitHub event payload
-func IssueEvent() map[string]any {
-	issue, ok := GitHubEvent()["issue"].(map[string]any)
-	if !ok {
-		panic("cannot parse GITHUB_EVENT_PATH pull_request")
+func IssueEvent() (map[string]any, error) {
+	event, err := GitHubEvent()
+	if err != nil {
+		return nil, err
 	}
-	return issue
+	issue, ok := event["issue"].(map[string]any)
+	if !ok {
+		return nil, fmt.Errorf("env: cannot parse GITHUB_EVENT_PATH pull_request")
+	}
+	return issue, nil
 }
 
 // tagRef constructs full Git tag reference string (e.g. "refs/tags/v1.0.0")
@@ -90,15 +96,16 @@ func shaFromTag(tag string) string {
 // parseMappedVersion splits the mapped version string into library name and version.
 // Input format: "clib/semver" where semver starts with 'v'
 // Panics if input format is invalid or version isn't valid semantic version
-func parseMappedVersion(version string) (clib, mappedVersion string) {
+func parseMappedVersion(version string) (clib, mappedVersion string, err error) {
 	arr := strings.Split(version, "/")
 	if len(arr) != 2 {
-		panic("invalid mapped version format")
+		err = fmt.Errorf("actions: invalid mapped version format")
+		return
 	}
 	clib, mappedVersion = arr[0], arr[1]
 
 	if !semver.IsValid(mappedVersion) {
-		panic("invalid mapped version format: mappedVersion is not a semver")
+		err = fmt.Errorf("actions: invalid mapped version format: mappedVersion is not a semver")
 	}
 	return
 }
@@ -117,16 +124,16 @@ func isValidLLPkg(files []os.DirEntry) bool {
 
 // checkLegacyVersion validates versioning strategy for legacy package submissions
 // Ensures semantic versioning compliance and proper branch maintenance strategy
-func checkLegacyVersion(ver *versions.Versions, cfg config.LLPkgConfig, mappedVersion string, isLegacy bool) {
+func checkLegacyVersion(ver *versions.Versions, cfg config.LLPkgConfig, mappedVersion string, isLegacy bool) error {
 	if slices.Contains(ver.GoVersions(cfg.Upstream.Package.Name), mappedVersion) {
-		panic("repeat semver")
+		return fmt.Errorf("actions: repeat semver %s", mappedVersion)
 	}
 	vers := ver.CVersions(cfg.Upstream.Package.Name)
 	currentVersion := versions.ToSemVer(cfg.Upstream.Package.Version)
 
 	// skip when we're the only latest version or C version doesn't follow semver.
 	if len(vers) == 0 || !semver.IsValid(currentVersion) {
-		return
+		return nil
 	}
 
 	sort.Sort(versions.ByVersionDescending(vers))
@@ -139,14 +146,14 @@ func checkLegacyVersion(ver *versions.Versions, cfg config.LLPkgConfig, mappedVe
 		// case1: we're the latest version, but mapped version is not latest, invalid.
 		// example: all version: 1.8.1 => v1.2.0 1.7.1 => v1.1.0 current: 1.9.1 => v1.0.0
 		if semver.Compare(ver.LatestGoVersion(cfg.Upstream.Package.Name), mappedVersion) > 0 {
-			panic("mapped version should not less than the legacy one.")
+			return fmt.Errorf("actions: mapped version should not less than the legacy one")
 		}
-		return
+		return nil
 	} else if !isLegacy {
 		// case2: if we're legacy version, the pr is submited to main, that's invalid.
 		// in the most common case, it should be conflict.
 		// however, consider about the extraordinary case.
-		panic("legacy version MUST not submit to main branch")
+		return fmt.Errorf("actions: legacy version MUST not submit to main branch")
 	}
 
 	// find the closest verion which is smaller than us.
@@ -159,7 +166,7 @@ func checkLegacyVersion(ver *versions.Versions, cfg config.LLPkgConfig, mappedVe
 	// case3: we're the smallest version
 	// example: latest: 1.6.1 maintain: 1.5.1, that's valid
 	if !hasClosestSemver {
-		return
+		return nil
 	}
 
 	// case4: the major and minor version of the previous version is same,
@@ -169,7 +176,7 @@ func checkLegacyVersion(ver *versions.Versions, cfg config.LLPkgConfig, mappedVe
 
 	if semver.MajorMinor(previousVersion) == semver.MajorMinor(currentVersion) &&
 		semver.Compare(previousVersion, currentVersion) > 0 {
-		panic(`cannot submit a historical legacy version.
+		return fmt.Errorf(`actions: cannot submit a historical legacy version.
 	for more details: https://github.com/goplus/llpkgstore/blob/main/docs/llpkgstore.md#branch-maintenance-strategy`)
 	}
 
@@ -178,14 +185,15 @@ func checkLegacyVersion(ver *versions.Versions, cfg config.LLPkgConfig, mappedVe
 	// example: current submit: 1.5.2 => v1.1.1, closest minor: 1.4.1 => v1.1.0, valid.
 	originalVersion := ver.SearchBySemVer(cfg.Upstream.Package.Name, vers[i])
 	if originalVersion == "" {
-		panic("cannot find original C version from semver, this should not happen.")
+		return fmt.Errorf("actions: cannot find original C version from semver")
 	}
 	closestMappedVersion := ver.LatestGoVersionForCVersion(cfg.Upstream.Package.Name, originalVersion)
 	if closestMappedVersion == "" {
-		panic("cannot find latest Go version from C version, this should not happen.")
+		return fmt.Errorf("cannot find latest Go version from C version")
 	}
 
 	if semver.Compare(closestMappedVersion, mappedVersion) > 0 {
-		panic("mapped version should not less than the legacy one.")
+		return fmt.Errorf("mapped version should not less than the legacy one")
 	}
+	return nil
 }

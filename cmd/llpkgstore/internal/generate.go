@@ -1,6 +1,7 @@
 package internal
 
 import (
+	"fmt"
 	"log"
 	"os"
 	"os/exec"
@@ -17,7 +18,7 @@ var generateCmd = &cobra.Command{
 	Use:   "generate",
 	Short: "PR Verification",
 	Long:  ``,
-	Run:   runLLCppgGenerate,
+	RunE:  runLLCppgGenerate,
 }
 
 func currentDir() string {
@@ -28,28 +29,31 @@ func currentDir() string {
 	return dir
 }
 
-func runLLCppgGenerateWithDir(dir string) {
+func runLLCppgGenerateWithDir(dir string) error {
 	cfg, err := config.ParseLLPkgConfig(filepath.Join(dir, LLGOModuleIdentifyFile))
 	if err != nil {
-		log.Fatalf("parse config error: %v", err)
+		return fmt.Errorf("parse config error: %v", err)
 	}
 	uc, err := config.NewUpstreamFromConfig(cfg.Upstream)
 	if err != nil {
-		log.Fatal(err)
+		return err
 	}
 	log.Printf("Start to generate %s", uc.Pkg.Name)
 
 	tempDir, err := os.MkdirTemp("", "llpkg-tool")
 	if err != nil {
-		log.Fatal(err)
+		return err
 	}
 	defer os.RemoveAll(tempDir)
 	pcName, err := uc.Installer.Install(uc.Pkg, tempDir)
 	if err != nil {
-		log.Fatal(err)
+		return err
 	}
 	// copy file for debugging.
-	file.CopyFilePattern(tempDir, dir, "*.pc")
+	err = file.CopyFilePattern(tempDir, dir, "*.pc")
+	if err != nil {
+		return err
+	}
 	// try llcppcfg if llcppg.cfg dones't exist
 	if _, err := os.Stat(filepath.Join(dir, "llcppg.cfg")); os.IsNotExist(err) {
 		cmd := exec.Command("llcppcfg", pcName[0])
@@ -57,34 +61,34 @@ func runLLCppgGenerateWithDir(dir string) {
 		pc.SetPath(cmd, tempDir)
 		ret, err := cmd.CombinedOutput()
 		if err != nil {
-			log.Fatalf("llcppcfg execute fail: %s", string(ret))
+			return fmt.Errorf("llcppcfg execute fail: %s", string(ret))
 		}
 	}
 
 	generator := llcppg.New(dir, cfg.Upstream.Package.Name, tempDir)
 
-	if err := generator.Generate(dir); err != nil {
-		log.Fatal(err)
-	}
+	return generator.Generate(dir)
 }
 
-func runLLCppgGenerate(_ *cobra.Command, args []string) {
+func runLLCppgGenerate(_ *cobra.Command, args []string) error {
 	exec.Command("conan", "profile", "detect").Run()
 
 	path := currentDir()
 	// by default, use current dir
 	if len(args) == 0 {
-		runLLCppgGenerateWithDir(path)
-		return
+		return runLLCppgGenerateWithDir(path)
 	}
 	for _, argPath := range args {
 		absPath, err := filepath.Abs(argPath)
 		if err != nil {
 			continue
 		}
-		runLLCppgGenerateWithDir(absPath)
+		err = runLLCppgGenerateWithDir(absPath)
+		if err != nil {
+			return err
+		}
 	}
-
+	return nil
 }
 
 func init() {

@@ -20,6 +20,7 @@ import (
 	"github.com/goplus/llpkgstore/internal/actions/versions"
 	"github.com/goplus/llpkgstore/internal/file"
 	"github.com/goplus/llpkgstore/internal/pc"
+	"golang.org/x/sync/errgroup"
 )
 
 const (
@@ -147,7 +148,11 @@ func (d *DefaultClient) isAssociatedWithPullRequest(sha string) bool {
 //	branchName: Base branch name
 //	legacy: True if branch starts with "release-branch."
 func (d *DefaultClient) isLegacyVersion() (branchName string, legacy bool, err error) {
-	pullRequest, ok := GitHubEvent()["pull_request"].(map[string]any)
+	event, err := GitHubEvent()
+	if err != nil {
+		return
+	}
+	pullRequest, ok := event["pull_request"].(map[string]any)
 	var refName string
 	if !ok {
 		var sha string
@@ -178,7 +183,10 @@ func (d *DefaultClient) isLegacyVersion() (branchName string, legacy bool, err e
 //
 //	[]*github.RepositoryCommit: List of PR commits
 func (d *DefaultClient) currentPRCommit() ([]*github.RepositoryCommit, error) {
-	pullRequest := PullRequestEvent()
+	pullRequest, err := PullRequestEvent()
+	if err != nil {
+		return nil, err
+	}
 	prNumber := int(pullRequest["number"].(float64))
 
 	ctx, cancel := context.WithTimeout(context.TODO(), 30*time.Second)
@@ -294,6 +302,9 @@ func (d *DefaultClient) mappedVersion() (string, error) {
 	}
 	// get message
 	commit, err := d.commitMessage(sha)
+	if err != nil {
+		return "", err
+	}
 
 	message := commit.GetCommit().GetMessage()
 
@@ -305,7 +316,7 @@ func (d *DefaultClient) mappedVersion() (string, error) {
 	}
 	version := strings.TrimPrefix(mappedVersion, MappedVersionPrefix)
 	if version == mappedVersion {
-		panic("invalid format")
+		return "", fmt.Errorf("actions: invalid format")
 	}
 	return strings.TrimSpace(version), nil
 }
@@ -465,35 +476,18 @@ func (d *DefaultClient) uploadArtifactsToRelease(release *github.RepositoryRelea
 		return nil, errors.New("actions: no artifact found")
 	}
 
-	semaCount := len(artifacts.Artifacts)
-	sema := make(chan struct{}, semaCount)
+	errGroup, _ := errgroup.WithContext(context.TODO())
 
-	uploadCtx, uploadCancel := context.WithCancelCause(context.TODO())
 	for _, artifact := range artifacts.Artifacts {
 		// make a copy to avoid for loop bug
 		artifactID := artifact.GetID()
-		go func() {
-			err := d.uploadArtifact(artifactID, release)
-			if err != nil {
-				uploadCancel(err)
-				return
-			}
-			sema <- struct{}{}
-		}()
+
+		errGroup.Go(func() error {
+			return d.uploadArtifact(artifactID, release)
+		})
 	}
 
-	for {
-		select {
-		case <-sema:
-			semaCount--
-			if semaCount <= 0 {
-				return
-			}
-		case <-uploadCtx.Done():
-			err = uploadCtx.Err()
-			return
-		}
-	}
+	return nil, errGroup.Wait()
 }
 
 // removeBranch deletes a branch from the repository
@@ -510,7 +504,7 @@ func (d *DefaultClient) removeBranch(branchName string) error {
 
 	_, err := d.client.Git.DeleteRef(ctx, d.owner, d.repo, branchRef(branchName))
 
-	return err
+	return wrapActionError(err)
 }
 
 // checkVersion performs version validation and configuration checks
@@ -518,24 +512,37 @@ func (d *DefaultClient) removeBranch(branchName string) error {
 //
 //	ver: Version store object
 //	cfg: Package configuration
-func (d *DefaultClient) checkVersion(ver *versions.Versions, cfg config.LLPkgConfig) {
+func (d *DefaultClient) checkVersion(ver *versions.Versions, cfg config.LLPkgConfig) error {
 	// 4. Check MappedVersion
-	version := d.checkMappedVersion(cfg.Upstream.Package.Name)
-	_, mappedVersion := parseMappedVersion(version)
+	version, err := d.checkMappedVersion(cfg.Upstream.Package.Name)
+	if err != nil {
+		return err
+	}
+	_, mappedVersion, err := parseMappedVersion(version)
+	if err != nil {
+		return err
+	}
 
 	// 5. Check version is valid
-	_, isLegacy := d.isLegacyVersion()
-	checkLegacyVersion(ver, cfg, mappedVersion, isLegacy)
+	_, isLegacy, err := d.isLegacyVersion()
+	if err != nil {
+		return err
+	}
+	return checkLegacyVersion(ver, cfg, mappedVersion, isLegacy)
 }
 
 // CheckPR validates PR changes and returns affected packages
 // Returns:
 //
 //	[]string: List of affected package paths
-func (d *DefaultClient) CheckPR() []string {
+func (d *DefaultClient) CheckPR() ([]string, error) {
 	// build a file path map
 	pathMap := map[string][]string{}
-	for _, path := range env.Changes() {
+	changedFilePaths, err := env.Changes()
+	if err != nil {
+		return nil, err
+	}
+	for _, path := range changedFilePaths {
 		dir := filepath.Dir(path)
 		// initialize the dir
 		pathMap[dir] = nil
@@ -547,7 +554,10 @@ func (d *DefaultClient) CheckPR() []string {
 
 	for path := range pathMap {
 		// don't retrieve files from pr changes, consider about maintenance case
-		files, _ := os.ReadDir(path)
+		files, err := os.ReadDir(path)
+		if err != nil {
+			return nil, wrapActionError(err)
+		}
 
 		if !isValidLLPkg(files) {
 			delete(pathMap, path)
@@ -557,7 +567,7 @@ func (d *DefaultClient) CheckPR() []string {
 		llpkgFile := filepath.Join(path, "llpkg.cfg")
 		cfg, err := config.ParseLLPkgConfig(llpkgFile)
 		if err != nil {
-			panic(err)
+			return nil, err
 		}
 		// in our design, directory name should equal to the package name,
 		// which means it's not required to be equal.
@@ -567,48 +577,57 @@ func (d *DefaultClient) CheckPR() []string {
 		// this logic may be changed in the future.
 		packageName := strings.TrimSpace(cfg.Upstream.Package.Name)
 		if packageName != path {
-			panic("directory name is not equal to package name in llpkg.cfg")
+			return nil, fmt.Errorf("actions: directory name is not equal to package name in llpkg.cfg")
 		}
-		d.checkVersion(ver, cfg)
+		err = d.checkVersion(ver, cfg)
+		if err != nil {
+			return nil, err
+		}
 
 		allPaths = append(allPaths, path)
 	}
 
 	// 1. Check there's only one directory in PR
 	if len(pathMap) > 1 {
-		panic("too many to-be-converted directory")
+		return nil, fmt.Errorf("actions: too many to-be-converted directory")
 	}
 
 	// 2. Check config files(llpkg.cfg and llcppg.cfg)
 	if len(pathMap) == 0 {
-		panic("no valid config files, llpkg.cfg and llcppg.cfg must exist")
+		return nil, fmt.Errorf("actions: no valid config files, llpkg.cfg and llcppg.cfg must exist")
 	}
 
-	return allPaths
+	return allPaths, nil
 }
 
 // Postprocessing handles version tagging and record updates after PR merge
 // Creates Git tags, updates version records, and cleans up legacy branches
-func (d *DefaultClient) Postprocessing() {
+func (d *DefaultClient) Postprocessing() error {
 	// https://docs.github.com/en/actions/writing-workflows/choosing-when-your-workflow-runs/events-that-trigger-workflows#push
-	sha := env.LatestCommitSHA()
+	sha, err := env.LatestCommitSHA()
+	if err != nil {
+		return err
+	}
 	// check it's associated with a pr
 	if !d.isAssociatedWithPullRequest(sha) {
 		// not a merge commit, skip it.
-		panic("not a merge request commit")
+		return fmt.Errorf("actions: not a merge request commit")
 	}
 
-	version := d.mappedVersion()
-	// skip it when no mapped version is found
-	if version == "" {
-		panic("no mapped version found in the commit message")
+	version, err := d.mappedVersion()
+	if err != nil {
+		return err
 	}
 
-	clib, mappedVersion := parseMappedVersion(version)
+	clib, mappedVersion, err := parseMappedVersion(version)
+	if err != nil {
+		return err
+	}
 
 	// the pr has merged, so we can read it.
 	cfg, err := config.ParseLLPkgConfig(filepath.Join(clib, "llpkg.cfg"))
 	if err != nil {
+		return err
 	}
 
 	// write it to llpkgstore.json
@@ -616,55 +635,78 @@ func (d *DefaultClient) Postprocessing() {
 	ver.Write(clib, cfg.Upstream.Package.Version, mappedVersion)
 
 	if hasTag(version) {
-		panic("tag has already existed")
+		return fmt.Errorf("actions: tag has already existed")
 	}
 
 	if err := d.createTag(version, sha); err != nil {
-		panic(err)
+		return err
 	}
 
 	// create a release
-	release := d.createReleaseByTag(version)
+	release, err := d.createReleaseByTag(version)
+	if err != nil {
+		return err
+	}
 
-	d.uploadArtifactsToRelease(release)
+	_, err = d.uploadArtifactsToRelease(release)
+	if err != nil {
+		return err
+	}
 
 	// we have finished tagging the commit, safe to remove the branch
-	if branchName, isLegacy := d.isLegacyVersion(); isLegacy {
-		d.removeBranch(branchName)
+	branchName, isLegacy, err := d.isLegacyVersion()
+	if err != nil {
+		return err
 	}
+	if isLegacy {
+		err = d.removeBranch(branchName)
+	}
+	return err
 	// move to website in Github Action...
 }
 
 // Release must be called before Postprocessing
-func (d *DefaultClient) Release() {
-	version := d.mappedVersion()
-	// skip it when no mapped version is found
-	if version == "" {
-		panic("no mapped version found in the commit message")
+func (d *DefaultClient) Release() error {
+	version, err := d.mappedVersion()
+	if err != nil {
+		return err
 	}
 
-	clib, _ := parseMappedVersion(version)
+	clib, _, err := parseMappedVersion(version)
+	if err != nil {
+		return err
+	}
 	// the pr has merged, so we can read it.
 	cfg, err := config.ParseLLPkgConfig(filepath.Join(clib, "llpkg.cfg"))
 	if err != nil {
+		return err
 	}
 
 	uc, err := config.NewUpstreamFromConfig(cfg.Upstream)
 	if err != nil {
+		return err
 	}
 
-	tempDir, _ := os.MkdirTemp("", "llpkg-tool")
+	tempDir, err := os.MkdirTemp("", "llpkg-tool")
+	if err != nil {
+		return wrapActionError(err)
+	}
 
 	deps, err := uc.Installer.Install(uc.Pkg, tempDir)
 	if err != nil {
+		return err
 	}
 
 	pkgConfigDir := filepath.Join(tempDir, "lib", "pkgconfig")
 	// clear exist .pc
-	os.RemoveAll(pkgConfigDir)
+	err = os.RemoveAll(pkgConfigDir)
+	if err != nil {
+		return wrapActionError(err)
+	}
 
 	err = os.Mkdir(pkgConfigDir, 0777)
 	if err != nil {
+		return wrapActionError(err)
 	}
 
 	for _, pcName := range deps {
@@ -672,6 +714,7 @@ func (d *DefaultClient) Release() {
 		// generate pc template to lib/pkgconfig
 		err = pc.GenerateTemplateFromPC(pcFile, pkgConfigDir, deps)
 		if err != nil {
+			return wrapActionError(err)
 		}
 	}
 
@@ -682,15 +725,17 @@ func (d *DefaultClient) Release() {
 	zipFilename := binaryZip(uc.Pkg.Name)
 	zipFilePath, err := filepath.Abs(zipFilename)
 	if err != nil {
+		return wrapActionError(err)
 	}
 
 	err = file.Zip(tempDir, zipFilePath)
 	if err != nil {
+		return wrapActionError(err)
 	}
 
 	// upload to artifacts in GitHub Action
 	// https://github.com/goplus/llpkg/pull/50/files#diff-95373be0ab51a56a2200c8c07981d82e81569f2cd1e4e2946e2002bb66de766fR56-R60
-	env.Setenv(env.Env{
+	return env.Setenv(env.Env{
 		"BIN_PATH":     zipFilePath,
 		"BIN_FILENAME": strings.TrimSuffix(zipFilename, ".zip"),
 	})
@@ -698,22 +743,25 @@ func (d *DefaultClient) Release() {
 
 // CreateBranchFromLabel creates release branch based on label format
 // Follows naming convention: release-branch.<CLibraryName>/<MappedVersion>
-func (d *DefaultClient) CreateBranchFromLabel(labelName string) {
+func (d *DefaultClient) CreateBranchFromLabel(labelName string) error {
 	// design: branch:release-branch.{CLibraryName}/{MappedVersion}
 	branchName := strings.TrimPrefix(strings.TrimSpace(labelName), LabelPrefix)
 	if branchName == labelName {
-		panic("invalid label name format")
+		return fmt.Errorf("actions: invalid label name format")
 	}
 
 	// fast-path: branch exists, can skip.
 	if d.hasBranch(branchName) {
-		return
+		return nil
 	}
 	version := strings.TrimPrefix(branchName, BranchPrefix)
 	if version == branchName {
-		panic("invalid label name format")
+		return fmt.Errorf("actions: invalid label name format")
 	}
-	clib, _ := parseMappedVersion(version)
+	clib, _, err := parseMappedVersion(version)
+	if err != nil {
+		return err
+	}
 	// slow-path: check the condition if we can create a branch
 	//
 	// create a branch only when this version is legacy.
@@ -724,22 +772,23 @@ func (d *DefaultClient) CreateBranchFromLabel(labelName string) {
 
 	cversions := ver.CVersions(clib)
 	if len(cversions) == 0 {
-		panic("no clib found")
+		return fmt.Errorf("actions: no clib found")
 	}
 
 	if !versions.IsSemver(cversions) {
-		panic("c version dones't follow semver, skip maintaining.")
+		return fmt.Errorf("actions: c version dones't follow semver, skip maintaining")
 	}
 
-	err := d.createBranch(branchName, shaFromTag(version))
-	if err != nil {
-	}
+	return d.createBranch(branchName, shaFromTag(version))
 }
 
 // CleanResource removes labels and resources after issue resolution
 // Verifies issue closure via PR merge before deletion
-func (d *DefaultClient) CleanResource() {
-	issueEvent := IssueEvent()
+func (d *DefaultClient) CleanResource() error {
+	issueEvent, err := IssueEvent()
+	if err != nil {
+		return err
+	}
 
 	issueNumber := int(issueEvent["number"].(float64))
 	regex := regexp.MustCompile(fmt.Sprintf(`(f|F)ix.*#%d`, issueNumber))
@@ -748,7 +797,11 @@ func (d *DefaultClient) CleanResource() {
 	// In Github, close a issue with a commit whose message follows this format
 	// fix/Fix* #{IssueNumber}
 	found := false
-	for _, commit := range d.allCommits() {
+	allCommits, err := d.allCommits()
+	if err != nil {
+		return err
+	}
+	for _, commit := range allCommits {
 		message := commit.Commit.GetMessage()
 
 		if regex.MatchString(message) &&
@@ -759,7 +812,7 @@ func (d *DefaultClient) CleanResource() {
 	}
 
 	if !found {
-		panic("current issue isn't closed by merged PR.")
+		return fmt.Errorf("actions: current issue isn't closed by merged PR")
 	}
 
 	var labelName string
@@ -775,8 +828,8 @@ func (d *DefaultClient) CleanResource() {
 	}
 
 	if labelName == "" {
-		panic("current issue hasn't labelled, this should not happen")
+		return fmt.Errorf("current issue hasn't labelled, this should not happen")
 	}
 
-	d.removeLabel(labelName)
+	return d.removeLabel(labelName)
 }

@@ -21,5 +21,5 @@ func wrapActionError(err error) error {
 }
 
 func (a *actionError) Error() string {
-	return fmt.Sprintf("actions: %w", a.Err)
+	return fmt.Sprintf("actions: %v", a.Err)
 }

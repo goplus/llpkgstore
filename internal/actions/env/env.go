@@ -117,3 +117,11 @@ func WorkflowRunID() (id int64, err error) {
 	}
 	return
 }
+
+func EventFile() ([]byte, error) {
+	eventFileName := os.Getenv("GITHUB_EVENT_PATH")
+	if eventFileName == "" {
+		return nil, newEnvError("GITHUB_EVENT_PATH")
+	}
+	return os.ReadFile(eventFileName)
+}

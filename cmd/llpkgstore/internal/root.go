@@ -1,7 +1,7 @@
 package internal
 
 import (
-	"os"
+	"log"
 
 	"github.com/spf13/cobra"
 )
@@ -20,7 +20,7 @@ such as binary installation, configuration file parsing, etc.
 func Execute() {
 	err := rootCmd.Execute()
 	if err != nil {
-		os.Exit(1)
+		log.Fatal(err)
 	}
 }
 

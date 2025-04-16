@@ -10,11 +10,15 @@ var issueCloseCmd = &cobra.Command{
 	Short: "Legacy version maintenance on label creating",
 	Long:  ``,
 
-	Run: runIssueCloseCmd,
+	RunE: runIssueCloseCmd,
 }
 
-func runIssueCloseCmd(cmd *cobra.Command, args []string) {
-	actions.NewDefaultClient().CleanResource()
+func runIssueCloseCmd(cmd *cobra.Command, args []string) error {
+	client, err := actions.NewDefaultClient()
+	if err != nil {
+		return err
+	}
+	return client.CleanResource()
 }
 
 func init() {
