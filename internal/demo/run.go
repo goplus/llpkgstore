@@ -24,7 +24,7 @@ import (
 	"github.com/goplus/llpkgstore/internal/pc"
 )
 
-func runDemo(demoRoot string) {
+func runDemo(demoRoot string) error {
 	demosPath := filepath.Join(demoRoot, "_demo")
 
 	fmt.Printf("testing demos in %s\n", demosPath)
@@ -32,22 +32,26 @@ func runDemo(demoRoot string) {
 	var demos []os.DirEntry
 	demos, err := os.ReadDir(demosPath)
 	if err != nil {
-		panic(fmt.Sprintf("failed to read demo directory: %v", err))
+		return fmt.Errorf("demotest: failed to read demo directory: %w", err)
 	}
 	for _, demo := range demos {
 		if demo.IsDir() {
 			fmt.Printf("Running demo: %s\n", demo.Name())
 			if demoErr := runCommand(demoRoot, filepath.Join(demosPath, demo.Name()), "llgo", "run", "."); demoErr != nil {
-				panic(fmt.Sprintf("failed to run demo: %s: %v", demo.Name(), demoErr))
+				return fmt.Errorf("demotest: failed to run demo: %s: %w", demo.Name(), demoErr)
 			}
 		}
 	}
+	return nil
 }
 
-func Run(baseDir string) {
+func Run(baseDir string) error {
 	fmt.Printf("Starting generated package tests in directory: %s\n", baseDir)
-	absDir, _ := filepath.Abs(baseDir)
-	runDemo(absDir)
+	absDir, err := filepath.Abs(baseDir)
+	if err != nil {
+		return err
+	}
+	return runDemo(absDir)
 }
 
 func runCommand(pcPath, dir, command string, args ...string) error {

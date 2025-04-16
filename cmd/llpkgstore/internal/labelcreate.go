@@ -1,6 +1,8 @@
 package internal
 
 import (
+	"fmt"
+
 	"github.com/goplus/llpkgstore/internal/actions"
 	"github.com/spf13/cobra"
 )
@@ -14,14 +16,18 @@ var labelCreateCmd = &cobra.Command{
 	Short: "Legacy version maintenance on label creating",
 	Long:  ``,
 
-	Run: runLabelCreateCmd,
+	RunE: runLabelCreateCmd,
 }
 
-func runLabelCreateCmd(cmd *cobra.Command, args []string) {
+func runLabelCreateCmd(cmd *cobra.Command, args []string) error {
 	if labelName == "" {
-		panic("no label name")
+		return fmt.Errorf("no label name")
 	}
-	actions.NewDefaultClient().CreateBranchFromLabel(labelName)
+	client, err := actions.NewDefaultClient()
+	if err != nil {
+		return err
+	}
+	return client.CreateBranchFromLabel(labelName)
 }
 
 func init() {

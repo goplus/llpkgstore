@@ -9,11 +9,15 @@ var releaseCmd = &cobra.Command{
 	Use:   "release",
 	Short: "Verify a PR",
 	Long:  ``,
-	Run:   runReleaseCmd,
+	RunE:  runReleaseCmd,
 }
 
-func runReleaseCmd(_ *cobra.Command, _ []string) {
-	actions.NewDefaultClient().Release()
+func runReleaseCmd(_ *cobra.Command, _ []string) error {
+	client, err := actions.NewDefaultClient()
+	if err != nil {
+		return err
+	}
+	return client.Release()
 }
 
 func init() {
