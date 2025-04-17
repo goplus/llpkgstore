@@ -13,27 +13,25 @@ var installCmd = &cobra.Command{
 	Short: "Manually install a package",
 	Long:  `Manually install a package from cfg file.`,
 	Args:  cobra.ExactArgs(1),
-	Run:   manuallyInstall,
+	RunE:  manuallyInstall,
 }
 
-func manuallyInstall(cmd *cobra.Command, args []string) {
+func manuallyInstall(cmd *cobra.Command, args []string) error {
 	cfgPath := strings.Join(args, " ")
 	output, err := cmd.Flags().GetString("output")
 	if err != nil {
-		cmd.PrintErrln("Error retrieving 'output' flag:", err)
-		return
+		return err
 	}
 	LLPkgConfig, err := config.ParseLLPkgConfig(cfgPath)
 	if err != nil {
-		cmd.PrintErrln("Error parsing LLPkgConfig:", err)
-		return
+		return err
 	}
 	upstream, err := config.NewUpstreamFromConfig(LLPkgConfig.Upstream)
 	if err != nil {
-		cmd.PrintErrln(err)
-		return
+		return err
 	}
-	upstream.Installer.Install(upstream.Pkg, output)
+	_, err = upstream.Installer.Install(upstream.Pkg, output)
+	return err
 }
 
 func init() {

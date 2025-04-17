@@ -12,10 +12,10 @@ import (
 var runCmd = &cobra.Command{
 	Use:   "demotest",
 	Short: "A tool that runs all demo",
-	Run:   runDemotestCmd,
+	RunE:  runDemotestCmd,
 }
 
-func runDemotestCmd(cmd *cobra.Command, args []string) {
+func runDemotestCmd(cmd *cobra.Command, args []string) error {
 	var paths []string
 	pathEnv := os.Getenv("LLPKG_PATH")
 	if pathEnv != "" {
@@ -26,8 +26,11 @@ func runDemotestCmd(cmd *cobra.Command, args []string) {
 	}
 
 	for _, path := range paths {
-		demo.Run(path)
+		if err := demo.Run(path); err != nil {
+			return err
+		}
 	}
+	return nil
 }
 
 func init() {

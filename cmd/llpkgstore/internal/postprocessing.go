@@ -9,11 +9,15 @@ var postProcessingCmd = &cobra.Command{
 	Use:   "postprocessing",
 	Short: "Verify a PR",
 	Long:  ``,
-	Run:   runPostProcessingCmd,
+	RunE:  runPostProcessingCmd,
 }
 
-func runPostProcessingCmd(_ *cobra.Command, _ []string) {
-	actions.NewDefaultClient().Postprocessing()
+func runPostProcessingCmd(_ *cobra.Command, _ []string) error {
+	client, err := actions.NewDefaultClient()
+	if err != nil {
+		return err
+	}
+	return client.Postprocessing()
 }
 
 func init() {
