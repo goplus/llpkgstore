@@ -18,8 +18,6 @@ import (
 	"github.com/goplus/llpkgstore/config"
 	"github.com/goplus/llpkgstore/internal/actions/env"
 	"github.com/goplus/llpkgstore/internal/actions/versions"
-	"github.com/goplus/llpkgstore/internal/file"
-	"github.com/goplus/llpkgstore/internal/pc"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -672,65 +670,14 @@ func (d *DefaultClient) Release() error {
 		return err
 	}
 
-	clib, _, err := parseMappedVersion(version)
-	if err != nil {
-		return err
-	}
-	// the pr has merged, so we can read it.
-	cfg, err := config.ParseLLPkgConfig(filepath.Join(clib, "llpkg.cfg"))
+	clibName, _, err := parseMappedVersion(version)
 	if err != nil {
 		return err
 	}
 
-	uc, err := config.NewUpstreamFromConfig(cfg.Upstream)
+	zipFilename, zipFilePath, err := BuildBinaryZip(clibName)
 	if err != nil {
 		return err
-	}
-
-	tempDir, err := os.MkdirTemp("", "llpkg-tool")
-	if err != nil {
-		return wrapActionError(err)
-	}
-
-	deps, err := uc.Installer.Install(uc.Pkg, tempDir)
-	if err != nil {
-		return err
-	}
-
-	pkgConfigDir := filepath.Join(tempDir, "lib", "pkgconfig")
-	// clear exist .pc
-	err = os.RemoveAll(pkgConfigDir)
-	if err != nil {
-		return wrapActionError(err)
-	}
-
-	err = os.Mkdir(pkgConfigDir, 0777)
-	if err != nil {
-		return wrapActionError(err)
-	}
-
-	for _, pcName := range deps {
-		pcFile := filepath.Join(tempDir, pcName+".pc")
-		// generate pc template to lib/pkgconfig
-		err = pc.GenerateTemplateFromPC(pcFile, pkgConfigDir, deps)
-		if err != nil {
-			return wrapActionError(err)
-		}
-	}
-
-	// okay, safe to remove old pc
-	file.RemovePattern(filepath.Join(tempDir, "*.pc"))
-	file.RemovePattern(filepath.Join(tempDir, "*.sh"))
-
-	zipFilename := binaryZip(uc.Pkg.Name)
-	zipFilePath, err := filepath.Abs(zipFilename)
-	if err != nil {
-		return wrapActionError(err)
-	}
-
-	err = file.Zip(tempDir, zipFilePath)
-	if err != nil {
-		return wrapActionError(err)
 	}
 
 	// upload to artifacts in GitHub Action

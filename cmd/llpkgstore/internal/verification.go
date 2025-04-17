@@ -40,13 +40,18 @@ func runLLCppgVerificationWithDir(dir string) error {
 
 	generated := filepath.Join(dir, ".generated")
 	os.Mkdir(generated, 0777)
-	// TODO(ghl): upload generated result to artifact for debugging.
-	defer os.Remove(generated)
 
 	if err := generator.Generate(generated); err != nil {
 		return err
 	}
-	return generator.Check(generated)
+	if err := generator.Check(generated); err != nil {
+		return err
+	}
+	// TODO(ghl): upload generated result to artifact for debugging.
+	os.RemoveAll(generated)
+	// start prebuilt check
+	_, _, err = actions.BuildBinaryZip(uc.Pkg.Name)
+	return err
 }
 
 func runLLCppgVerification(_ *cobra.Command, _ []string) error {

@@ -16,6 +16,8 @@ import (
 	"github.com/goplus/llpkgstore/config"
 	"github.com/goplus/llpkgstore/internal/actions/env"
 	"github.com/goplus/llpkgstore/internal/actions/versions"
+	"github.com/goplus/llpkgstore/internal/file"
+	"github.com/goplus/llpkgstore/internal/pc"
 	"golang.org/x/mod/semver"
 )
 
@@ -196,4 +198,70 @@ func checkLegacyVersion(ver *versions.Versions, cfg config.LLPkgConfig, mappedVe
 		return fmt.Errorf("mapped version should not less than the legacy one")
 	}
 	return nil
+}
+
+func BuildBinaryZip(packageName string) (zipFileName, zipFilePath string, err error) {
+	// the pr has merged, so we can read it.
+	cfg, err := config.ParseLLPkgConfig(filepath.Join(packageName, "llpkg.cfg"))
+	if err != nil {
+		return
+	}
+
+	uc, err := config.NewUpstreamFromConfig(cfg.Upstream)
+	if err != nil {
+		return
+	}
+
+	tempDir, err := os.MkdirTemp("", "llpkg-tool")
+	if err != nil {
+		err = wrapActionError(err)
+		return
+	}
+
+	deps, err := uc.Installer.Install(uc.Pkg, tempDir)
+	if err != nil {
+		return
+	}
+
+	pkgConfigDir := filepath.Join(tempDir, "lib", "pkgconfig")
+	// clear exist .pc
+	err = os.RemoveAll(pkgConfigDir)
+	if err != nil {
+		err = wrapActionError(err)
+		return
+	}
+
+	err = os.Mkdir(pkgConfigDir, 0777)
+	if err != nil {
+		err = wrapActionError(err)
+		return
+	}
+
+	for _, pcName := range deps {
+		pcFile := filepath.Join(tempDir, pcName+".pc")
+		// generate pc template to lib/pkgconfig
+		err = pc.GenerateTemplateFromPC(pcFile, pkgConfigDir, deps)
+		if err != nil {
+			err = wrapActionError(err)
+			return
+		}
+	}
+
+	// okay, safe to remove old pc
+	file.RemovePattern(filepath.Join(tempDir, "*.pc"))
+	file.RemovePattern(filepath.Join(tempDir, "*.sh"))
+
+	zipFileName = binaryZip(uc.Pkg.Name)
+	zipFilePath, err = filepath.Abs(zipFileName)
+	if err != nil {
+		err = wrapActionError(err)
+		return
+	}
+
+	err = file.Zip(tempDir, zipFilePath)
+	if err != nil {
+		err = wrapActionError(err)
+	}
+
+	return
 }
