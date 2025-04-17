@@ -50,7 +50,7 @@ func runLLCppgVerificationWithDir(dir string) error {
 	// TODO(ghl): upload generated result to artifact for debugging.
 	os.RemoveAll(generated)
 	// start prebuilt check
-	_, _, err = actions.BuildBinaryZip(uc.Pkg.Name)
+	_, _, err = actions.BuildBinaryZip(uc)
 	return err
 }
 

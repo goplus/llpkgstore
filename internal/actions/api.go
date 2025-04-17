@@ -675,7 +675,18 @@ func (d *DefaultClient) Release() error {
 		return err
 	}
 
-	zipFilename, zipFilePath, err := BuildBinaryZip(clibName)
+	// the pr has merged, so we can read it.
+	cfg, err := config.ParseLLPkgConfig(filepath.Join(clibName, "llpkg.cfg"))
+	if err != nil {
+		return err
+	}
+
+	uc, err := config.NewUpstreamFromConfig(cfg.Upstream)
+	if err != nil {
+		return err
+	}
+
+	zipFilename, zipFilePath, err := BuildBinaryZip(uc)
 	if err != nil {
 		return err
 	}

@@ -18,6 +18,7 @@ import (
 	"github.com/goplus/llpkgstore/internal/actions/versions"
 	"github.com/goplus/llpkgstore/internal/file"
 	"github.com/goplus/llpkgstore/internal/pc"
+	"github.com/goplus/llpkgstore/upstream"
 	"golang.org/x/mod/semver"
 )
 
@@ -200,18 +201,7 @@ func checkLegacyVersion(ver *versions.Versions, cfg config.LLPkgConfig, mappedVe
 	return nil
 }
 
-func BuildBinaryZip(packageName string) (zipFileName, zipFilePath string, err error) {
-	// the pr has merged, so we can read it.
-	cfg, err := config.ParseLLPkgConfig(filepath.Join(packageName, "llpkg.cfg"))
-	if err != nil {
-		return
-	}
-
-	uc, err := config.NewUpstreamFromConfig(cfg.Upstream)
-	if err != nil {
-		return
-	}
-
+func BuildBinaryZip(uc *upstream.Upstream) (zipFileName, zipFilePath string, err error) {
 	tempDir, err := os.MkdirTemp("", "llpkg-tool")
 	if err != nil {
 		err = wrapActionError(err)
