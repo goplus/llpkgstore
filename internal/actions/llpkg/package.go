@@ -28,6 +28,14 @@ type LLPkg struct {
 
 // Creates a new LLPkg instance by reading configuration from the specified path
 func NewLLPkg(packagePath string) (*LLPkg, error) {
+	if packagePath == "" {
+		var err error
+		packagePath, err = os.Getwd()
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	l := &LLPkg{packagePath: packagePath}
 
 	if err := l.readPackageConfig(); err != nil {
