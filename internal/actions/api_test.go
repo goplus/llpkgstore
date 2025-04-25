@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/goplus/llpkgstore/config"
+	"github.com/goplus/llpkgstore/internal/actions/llpkg"
 	"github.com/goplus/llpkgstore/internal/actions/versions"
 )
 
@@ -39,8 +39,8 @@ func TestLegacyVersion1(t *testing.T) {
 		  }
 		}
 	  }`
-	os.WriteFile(".llpkg.cfg", []byte(testLLPkgConfig), 0755)
-	defer os.Remove(".llpkg.cfg")
+	os.WriteFile("llpkg.cfg", []byte(testLLPkgConfig), 0755)
+	defer os.Remove("llpkg.cfg")
 
 	b := []byte(`{
 		"cjson": {
@@ -55,11 +55,15 @@ func TestLegacyVersion1(t *testing.T) {
 	os.WriteFile(".llpkgstore.json", []byte(b), 0755)
 	defer os.Remove(".llpkgstore.json")
 
-	cfg, _ := config.ParseLLPkgConfig(".llpkg.cfg")
+	pkg, err := llpkg.NewLLPkg("")
+	if err != nil {
+		t.Error(err)
+		return
+	}
 	ver := versions.Read(".llpkgstore.json")
 
-	err := actionFn("main", func(legacy bool) error {
-		return checkLegacyVersion(ver, cfg, "v0.1.1", legacy)
+	err = actionFn("main", func(legacy bool) error {
+		return checkLegacyVersion(ver, pkg, "v0.1.1", legacy)
 	})
 
 	if err == nil {
@@ -78,8 +82,8 @@ func TestLegacyVersion2(t *testing.T) {
 		  }
 		}
 	  }`
-	os.WriteFile(".llpkg.cfg", []byte(testLLPkgConfig), 0755)
-	defer os.Remove(".llpkg.cfg")
+	os.WriteFile("llpkg.cfg", []byte(testLLPkgConfig), 0755)
+	defer os.Remove("llpkg.cfg")
 
 	b := []byte(`{
 		"cjson": {
@@ -94,11 +98,15 @@ func TestLegacyVersion2(t *testing.T) {
 	os.WriteFile(".llpkgstore.json", []byte(b), 0755)
 	defer os.Remove(".llpkgstore.json")
 
-	cfg, _ := config.ParseLLPkgConfig(".llpkg.cfg")
+	pkg, err := llpkg.NewLLPkg("")
+	if err != nil {
+		t.Error(err)
+		return
+	}
 	ver := versions.Read(".llpkgstore.json")
 
-	err := actionFn("release-branch.cjson/v0.1.1", func(legacy bool) error {
-		return checkLegacyVersion(ver, cfg, "v0.1.2", legacy)
+	err = actionFn("release-branch.cjson/v0.1.1", func(legacy bool) error {
+		return checkLegacyVersion(ver, pkg, "v0.1.2", legacy)
 	})
 	isValid := err == nil
 
@@ -117,8 +125,8 @@ func TestLegacyVersion3(t *testing.T) {
 		  }
 		}
 	  }`
-	os.WriteFile(".llpkg.cfg", []byte(testLLPkgConfig), 0755)
-	defer os.Remove(".llpkg.cfg")
+	os.WriteFile("llpkg.cfg", []byte(testLLPkgConfig), 0755)
+	defer os.Remove("llpkg.cfg")
 
 	b := []byte(`{
 		"cjson": {
@@ -133,11 +141,15 @@ func TestLegacyVersion3(t *testing.T) {
 	os.WriteFile(".llpkgstore.json", []byte(b), 0755)
 	defer os.Remove(".llpkgstore.json")
 
-	cfg, _ := config.ParseLLPkgConfig(".llpkg.cfg")
+	pkg, err := llpkg.NewLLPkg("")
+	if err != nil {
+		t.Error(err)
+		return
+	}
 	ver := versions.Read(".llpkgstore.json")
 
-	err := actionFn("main", func(legacy bool) error {
-		return checkLegacyVersion(ver, cfg, "v0.3.0", legacy)
+	err = actionFn("main", func(legacy bool) error {
+		return checkLegacyVersion(ver, pkg, "v0.3.0", legacy)
 	})
 	isValid := err == nil
 
@@ -156,8 +168,8 @@ func TestLegacyVersion4(t *testing.T) {
 		  }
 		}
 	  }`
-	os.WriteFile(".llpkg.cfg", []byte(testLLPkgConfig), 0755)
-	defer os.Remove(".llpkg.cfg")
+	os.WriteFile("llpkg.cfg", []byte(testLLPkgConfig), 0755)
+	defer os.Remove("llpkg.cfg")
 
 	b := []byte(`{
 		"cjson": {
@@ -172,11 +184,15 @@ func TestLegacyVersion4(t *testing.T) {
 	os.WriteFile(".llpkgstore.json", []byte(b), 0755)
 	defer os.Remove(".llpkgstore.json")
 
-	cfg, _ := config.ParseLLPkgConfig(".llpkg.cfg")
+	pkg, err := llpkg.NewLLPkg("")
+	if err != nil {
+		t.Error(err)
+		return
+	}
 	ver := versions.Read(".llpkgstore.json")
 
-	err := actionFn("main", func(legacy bool) error {
-		return checkLegacyVersion(ver, cfg, "v0.0.1", legacy)
+	err = actionFn("main", func(legacy bool) error {
+		return checkLegacyVersion(ver, pkg, "v0.0.1", legacy)
 	})
 
 	if err == nil {
@@ -194,8 +210,8 @@ func TestLegacyVersion5(t *testing.T) {
 		  }
 		}
 	  }`
-	os.WriteFile(".llpkg.cfg", []byte(testLLPkgConfig), 0755)
-	defer os.Remove(".llpkg.cfg")
+	os.WriteFile("llpkg.cfg", []byte(testLLPkgConfig), 0755)
+	defer os.Remove("llpkg.cfg")
 
 	b := []byte(`{
 		"cjson": {
@@ -210,11 +226,15 @@ func TestLegacyVersion5(t *testing.T) {
 	os.WriteFile(".llpkgstore.json", []byte(b), 0755)
 	defer os.Remove(".llpkgstore.json")
 
-	cfg, _ := config.ParseLLPkgConfig(".llpkg.cfg")
+	pkg, err := llpkg.NewLLPkg("")
+	if err != nil {
+		t.Error(err)
+		return
+	}
 	ver := versions.Read(".llpkgstore.json")
 
-	err := actionFn("main", func(legacy bool) error {
-		return checkLegacyVersion(ver, cfg, "v0.1.1", legacy)
+	err = actionFn("main", func(legacy bool) error {
+		return checkLegacyVersion(ver, pkg, "v0.1.1", legacy)
 	})
 
 	if err == nil {

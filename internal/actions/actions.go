@@ -13,8 +13,8 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/goplus/llpkgstore/config"
 	"github.com/goplus/llpkgstore/internal/actions/env"
+	"github.com/goplus/llpkgstore/internal/actions/llpkg"
 	"github.com/goplus/llpkgstore/internal/actions/versions"
 	"github.com/goplus/llpkgstore/internal/file"
 	"github.com/goplus/llpkgstore/internal/pc"
@@ -114,25 +114,35 @@ func parseMappedVersion(version string) (clib, mappedVersion string, err error) 
 }
 
 // isValidLLPkg checks if directory contains both llpkg.cfg and llcppg.cfg
-func isValidLLPkg(files []os.DirEntry) bool {
+func isLLPkgRoot(path string) bool {
+	// don't retrieve files from pr changes, consider about maintenance case
+	files, err := os.ReadDir(path)
+	if err != nil {
+		return false
+	}
 	fileMap := make(map[string]struct{}, len(files))
 
 	for _, file := range files {
 		fileMap[filepath.Base(file.Name())] = struct{}{}
 	}
+
 	_, hasLLPkg := fileMap["llpkg.cfg"]
 	_, hasLLCppg := fileMap["llcppg.cfg"]
-	return hasLLCppg && hasLLPkg
+	_, hasGoMod := fileMap["go.mod"]
+	return hasLLCppg && hasLLPkg && hasGoMod
 }
 
 // checkLegacyVersion validates versioning strategy for legacy package submissions
 // Ensures semantic versioning compliance and proper branch maintenance strategy
-func checkLegacyVersion(ver *versions.Versions, cfg config.LLPkgConfig, mappedVersion string, isLegacy bool) error {
-	if slices.Contains(ver.GoVersions(cfg.Upstream.Package.Name), mappedVersion) {
+func checkLegacyVersion(ver *versions.Versions, pkg *llpkg.LLPkg, mappedVersion string, isLegacy bool) error {
+	clibName := pkg.ClibName()
+	clibVersion := pkg.ClibVersion()
+
+	if slices.Contains(ver.GoVersions(clibName), mappedVersion) {
 		return fmt.Errorf("actions: repeat semver %s", mappedVersion)
 	}
-	vers := ver.CVersions(cfg.Upstream.Package.Name)
-	currentVersion := versions.ToSemVer(cfg.Upstream.Package.Version)
+	vers := ver.CVersions(clibName)
+	currentVersion := versions.ToSemVer(clibVersion)
 
 	// skip when we're the only latest version or C version doesn't follow semver.
 	if len(vers) == 0 || !semver.IsValid(currentVersion) {
@@ -148,7 +158,7 @@ func checkLegacyVersion(ver *versions.Versions, cfg config.LLPkgConfig, mappedVe
 	if isLatest {
 		// case1: we're the latest version, but mapped version is not latest, invalid.
 		// example: all version: 1.8.1 => v1.2.0 1.7.1 => v1.1.0 current: 1.9.1 => v1.0.0
-		if semver.Compare(ver.LatestGoVersion(cfg.Upstream.Package.Name), mappedVersion) > 0 {
+		if semver.Compare(ver.LatestGoVersion(clibName), mappedVersion) > 0 {
 			return fmt.Errorf("actions: mapped version should not less than the legacy one")
 		}
 		return nil
@@ -186,11 +196,11 @@ func checkLegacyVersion(ver *versions.Versions, cfg config.LLPkgConfig, mappedVe
 	// case5: we're the latest patch version for current major and minor, check the mapped version
 	// our mapped version should be larger than the closest one.
 	// example: current submit: 1.5.2 => v1.1.1, closest minor: 1.4.1 => v1.1.0, valid.
-	originalVersion := ver.SearchBySemVer(cfg.Upstream.Package.Name, vers[i])
+	originalVersion := ver.SearchBySemVer(clibName, vers[i])
 	if originalVersion == "" {
 		return fmt.Errorf("actions: cannot find original C version from semver")
 	}
-	closestMappedVersion := ver.LatestGoVersionForCVersion(cfg.Upstream.Package.Name, originalVersion)
+	closestMappedVersion := ver.LatestGoVersionForCVersion(clibName, originalVersion)
 	if closestMappedVersion == "" {
 		return fmt.Errorf("cannot find latest Go version from C version")
 	}

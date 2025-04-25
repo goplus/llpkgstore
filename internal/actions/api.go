@@ -15,8 +15,8 @@ import (
 	"time"
 
 	"github.com/google/go-github/v69/github"
-	"github.com/goplus/llpkgstore/config"
 	"github.com/goplus/llpkgstore/internal/actions/env"
+	"github.com/goplus/llpkgstore/internal/actions/llpkg"
 	"github.com/goplus/llpkgstore/internal/actions/versions"
 	"golang.org/x/sync/errgroup"
 )
@@ -244,8 +244,8 @@ func (d *DefaultClient) removeLabel(labelName string) error {
 // Panics:
 //
 //	If no valid version found in PR commits
-func (d *DefaultClient) checkMappedVersion(packageName string) (mappedVersion string, err error) {
-	matchMappedVersion := regex(packageName)
+func (d *DefaultClient) checkMappedVersion(pkg *llpkg.LLPkg) (mappedVersion string, err error) {
+	matchMappedVersion := regex(pkg.Name())
 
 	allCommits, err := d.currentPRCommit()
 	if err != nil {
@@ -510,9 +510,9 @@ func (d *DefaultClient) removeBranch(branchName string) error {
 //
 //	ver: Version store object
 //	cfg: Package configuration
-func (d *DefaultClient) checkVersion(ver *versions.Versions, cfg config.LLPkgConfig) error {
+func (d *DefaultClient) checkVersion(ver *versions.Versions, pkg *llpkg.LLPkg) error {
 	// 4. Check MappedVersion
-	version, err := d.checkMappedVersion(cfg.Upstream.Package.Name)
+	version, err := d.checkMappedVersion(pkg)
 	if err != nil {
 		return err
 	}
@@ -526,7 +526,7 @@ func (d *DefaultClient) checkVersion(ver *versions.Versions, cfg config.LLPkgCon
 	if err != nil {
 		return err
 	}
-	return checkLegacyVersion(ver, cfg, mappedVersion, isLegacy)
+	return checkLegacyVersion(ver, pkg, mappedVersion, isLegacy)
 }
 
 // CheckPR validates PR changes and returns affected packages
@@ -551,43 +551,19 @@ func (d *DefaultClient) CheckPR() ([]string, error) {
 	ver := versions.Read("llpkgstore.json")
 
 	for path := range pathMap {
-		// don't retrieve files from pr changes, consider about maintenance case
-		files, err := os.ReadDir(path)
-		if err != nil {
-			return nil, wrapActionError(err)
-		}
-
-		if !isValidLLPkg(files) {
+		if !isLLPkgRoot(path) {
 			delete(pathMap, path)
 			continue
 		}
-		// 3. Check directory name
-		llpkgFile := filepath.Join(path, "llpkg.cfg")
-		cfg, err := config.ParseLLPkgConfig(llpkgFile)
+		pkg, err := llpkg.NewLLPkg(path)
 		if err != nil {
 			return nil, err
 		}
-		// in our design, directory name should equal to the package name,
-		// which means it's not required to be equal.
-		//
-		// However, at the current stage, if this is not equal, conan may panic,
-		// to aovid unexpected behavior, we assert it's equal temporarily.
-		// this logic may be changed in the future.
-		packageName := strings.TrimSpace(cfg.Upstream.Package.Name)
-		if packageName != path {
-			return nil, fmt.Errorf("actions: directory name is not equal to package name in llpkg.cfg")
-		}
-		err = d.checkVersion(ver, cfg)
+		err = d.checkVersion(ver, pkg)
 		if err != nil {
 			return nil, err
 		}
-
 		allPaths = append(allPaths, path)
-	}
-
-	// 1. Check there's only one directory in PR
-	if len(pathMap) > 1 {
-		return nil, fmt.Errorf("actions: too many to-be-converted directory")
 	}
 
 	// 2. Check config files(llpkg.cfg and llcppg.cfg)
@@ -622,15 +598,14 @@ func (d *DefaultClient) Postprocessing() error {
 		return err
 	}
 
-	// the pr has merged, so we can read it.
-	cfg, err := config.ParseLLPkgConfig(filepath.Join(clib, "llpkg.cfg"))
+	pkg, err := llpkg.NewLLPkg(clib)
 	if err != nil {
 		return err
 	}
 
 	// write it to llpkgstore.json
 	ver := versions.Read("llpkgstore.json")
-	ver.Write(clib, cfg.Upstream.Package.Version, mappedVersion)
+	ver.Write(clib, pkg.ClibName(), mappedVersion)
 
 	if hasTag(version) {
 		return fmt.Errorf("actions: tag has already existed")
@@ -674,14 +649,11 @@ func (d *DefaultClient) Release() error {
 	if err != nil {
 		return err
 	}
-
-	// the pr has merged, so we can read it.
-	cfg, err := config.ParseLLPkgConfig(filepath.Join(clibName, "llpkg.cfg"))
+	pkg, err := llpkg.NewLLPkg(clibName)
 	if err != nil {
 		return err
 	}
-
-	uc, err := config.NewUpstreamFromConfig(cfg.Upstream)
+	uc, err := pkg.Upstream()
 	if err != nil {
 		return err
 	}
@@ -716,7 +688,11 @@ func (d *DefaultClient) CreateBranchFromLabel(labelName string) error {
 	if version == branchName {
 		return fmt.Errorf("actions: invalid label name format")
 	}
-	clib, _, err := parseMappedVersion(version)
+	clibName, _, err := parseMappedVersion(version)
+	if err != nil {
+		return err
+	}
+	pkg, err := llpkg.NewLLPkg(clibName)
 	if err != nil {
 		return err
 	}
@@ -728,7 +704,7 @@ func (d *DefaultClient) CreateBranchFromLabel(labelName string) error {
 	// get latest version of the clib
 	ver := versions.Read("llpkgstore.json")
 
-	cversions := ver.CVersions(clib)
+	cversions := ver.CVersions(pkg.ClibName())
 	if len(cversions) == 0 {
 		return fmt.Errorf("actions: no clib found")
 	}
