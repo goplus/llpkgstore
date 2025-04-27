@@ -31,6 +31,10 @@ func runLLCppgVerificationWithDir(dir string) error {
 	if err != nil {
 		return err
 	}
+	_, err = uc.Installer.Install(uc.Pkg, dir)
+	if err != nil {
+		return err
+	}
 	generator := llcppg.New(dir, pkg.Name(), dir)
 
 	generated := filepath.Join(dir, ".generated")
