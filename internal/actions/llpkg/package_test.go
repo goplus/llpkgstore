@@ -17,10 +17,16 @@ func demoDir() (dir string, err error) {
 	return
 }
 
-func checkName(t *testing.T, demoDir string) {
+func checkName(t *testing.T, demoDir string, wantErr bool) {
 	pkg, err := NewLLPkg(demoDir)
 	if err != nil {
-		t.Error(err)
+		if !wantErr {
+			t.Error(err)
+		}
+		return
+	}
+	if wantErr {
+		t.Error("unexpected no error")
 		return
 	}
 	if pkg.Name() != "libcjson" {
@@ -55,7 +61,7 @@ func TestReadConfig(t *testing.T) {
 		}
 		defer os.Remove(tempGoModFileName)
 
-		checkName(t, demoDir)
+		checkName(t, demoDir, false)
 	})
 
 	t.Run("without-version-suffix", func(t *testing.T) {
@@ -69,7 +75,7 @@ func TestReadConfig(t *testing.T) {
 		}
 		defer os.Remove(tempGoModFileName)
 
-		checkName(t, demoDir)
+		checkName(t, demoDir, false)
 	})
 
 	t.Run("raw-package-name", func(t *testing.T) {
@@ -83,8 +89,22 @@ func TestReadConfig(t *testing.T) {
 		}
 		defer os.Remove(tempGoModFileName)
 
-		checkName(t, demoDir)
+		checkName(t, demoDir, false)
 
+	})
+
+	t.Run("wrong-go-mod", func(t *testing.T) {
+		err := os.WriteFile(tempGoModFileName, []byte(`go 1.22.0`), 0644)
+		if err != nil {
+			t.Error(err)
+			return
+		}
+
+		checkName(t, demoDir, true)
+	})
+
+	t.Run("no-go-mod", func(t *testing.T) {
+		checkName(t, demoDir, true)
 	})
 
 }
