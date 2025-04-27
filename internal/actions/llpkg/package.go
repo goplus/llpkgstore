@@ -2,6 +2,7 @@
 package llpkg
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path"
@@ -12,6 +13,8 @@ import (
 	"golang.org/x/mod/modfile"
 	"golang.org/x/mod/semver"
 )
+
+var ErrNoModulePath = errors.New("llpkg: no module path")
 
 // Wraps an error with the "llpkg" prefix for better context
 func wrapLLPkgError(err error) error {
@@ -82,6 +85,10 @@ func (p *LLPkg) readPackageConfig() (err error) {
 	modFile, err := modfile.Parse(goModFileName, goModContent, nil)
 	if err != nil {
 		err = wrapLLPkgError(err)
+		return
+	}
+	if modFile.Module == nil {
+		err = ErrNoModulePath
 		return
 	}
 	packageName := path.Base(modFile.Module.Mod.Path)
