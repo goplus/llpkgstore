@@ -2,15 +2,14 @@ package internal
 
 import (
 	"encoding/json"
-	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
 
-	"github.com/goplus/llpkgstore/config"
 	"github.com/goplus/llpkgstore/internal/actions"
 	"github.com/goplus/llpkgstore/internal/actions/env"
 	"github.com/goplus/llpkgstore/internal/actions/generator/llcppg"
+	"github.com/goplus/llpkgstore/internal/actions/llpkg"
 	"github.com/spf13/cobra"
 )
 
@@ -24,19 +23,15 @@ var verificationCmd = &cobra.Command{
 }
 
 func runLLCppgVerificationWithDir(dir string) error {
-	cfg, err := config.ParseLLPkgConfig(filepath.Join(dir, LLGOModuleIdentifyFile))
-	if err != nil {
-		return fmt.Errorf("parse config error: %v", err)
-	}
-	uc, err := config.NewUpstreamFromConfig(cfg.Upstream)
+	pkg, err := llpkg.NewLLPkg(dir)
 	if err != nil {
 		return err
 	}
-	_, err = uc.Installer.Install(uc.Pkg, dir)
+	uc, err := pkg.Upstream()
 	if err != nil {
 		return err
 	}
-	generator := llcppg.New(dir, cfg.Upstream.Package.Name, dir)
+	generator := llcppg.New(dir, pkg.Name(), dir)
 
 	generated := filepath.Join(dir, ".generated")
 	os.Mkdir(generated, 0777)
