@@ -65,7 +65,7 @@ func runLLCppgGenerateWithDir(dir string) error {
 		}
 	}
 
-	generator := llcppg.New(dir, cfg.Upstream.Package.Name, tempDir)
+	generator := llcppg.New(dir, filepath.Base(dir), tempDir)
 
 	return generator.Generate(dir)
 }
