@@ -3,6 +3,7 @@ package actions
 import (
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -30,6 +31,28 @@ func actionFn(branchName string, fn func(legacy bool) error) error {
 	return fn(strings.HasPrefix(branchName, BranchPrefix))
 }
 
+func prepareEnv(llpkgConfig, mappingTable []byte) (testDir string, err error) {
+	testDir, err = os.MkdirTemp("", "action-test")
+	if err != nil {
+		return
+	}
+	err = os.WriteFile(filepath.Join(testDir, "llpkg.cfg"), []byte(llpkgConfig), 0755)
+	if err != nil {
+		os.RemoveAll(testDir)
+		return
+	}
+	err = os.WriteFile(filepath.Join(testDir, "llpkgstore.json"), mappingTable, 0644)
+	if err != nil {
+		os.RemoveAll(testDir)
+		return
+	}
+
+	os.WriteFile(filepath.Join(testDir, "go.mod"), []byte(`module cjson
+	go 1.22
+	`), 0644)
+	return
+}
+
 func TestLegacyVersion1(t *testing.T) {
 	testLLPkgConfig := `{
 		"upstream": {
@@ -39,10 +62,8 @@ func TestLegacyVersion1(t *testing.T) {
 		  }
 		}
 	  }`
-	os.WriteFile("llpkg.cfg", []byte(testLLPkgConfig), 0755)
-	defer os.Remove("llpkg.cfg")
 
-	b := []byte(`{
+	testMappingTable := `{
 		"cjson": {
 			"versions" : {
 				"1.7.16": ["v0.1.0"],
@@ -50,17 +71,21 @@ func TestLegacyVersion1(t *testing.T) {
 				"1.8.18": ["v0.1.0", "v0.1.1"]
 			}
 		}
-	}`)
+	}`
 
-	os.WriteFile(".llpkgstore.json", []byte(b), 0755)
-	defer os.Remove(".llpkgstore.json")
-
-	pkg, err := llpkg.NewLLPkg("")
+	testDir, err := prepareEnv([]byte(testLLPkgConfig), []byte(testMappingTable))
 	if err != nil {
 		t.Error(err)
 		return
 	}
-	ver := versions.Read(".llpkgstore.json")
+	defer os.RemoveAll(testDir)
+
+	pkg, err := llpkg.NewLLPkg(testDir)
+	if err != nil {
+		t.Error(err)
+		return
+	}
+	ver := versions.Read(filepath.Join(testDir, "llpkgstore.json"))
 
 	err = actionFn("main", func(legacy bool) error {
 		return checkLegacyVersion(ver, pkg, "v0.1.1", legacy)
@@ -82,10 +107,8 @@ func TestLegacyVersion2(t *testing.T) {
 		  }
 		}
 	  }`
-	os.WriteFile("llpkg.cfg", []byte(testLLPkgConfig), 0755)
-	defer os.Remove("llpkg.cfg")
 
-	b := []byte(`{
+	testMappingTable := `{
 		"cjson": {
 			"versions" : {
 				"1.8.18": ["v0.2.0", "v0.2.1"],
@@ -93,17 +116,21 @@ func TestLegacyVersion2(t *testing.T) {
 				"1.7.16: ["v1.1.0"]
 			}
 		}
-	}`)
+	}`
 
-	os.WriteFile(".llpkgstore.json", []byte(b), 0755)
-	defer os.Remove(".llpkgstore.json")
-
-	pkg, err := llpkg.NewLLPkg("")
+	testDir, err := prepareEnv([]byte(testLLPkgConfig), []byte(testMappingTable))
 	if err != nil {
 		t.Error(err)
 		return
 	}
-	ver := versions.Read(".llpkgstore.json")
+	defer os.RemoveAll(testDir)
+
+	pkg, err := llpkg.NewLLPkg(testDir)
+	if err != nil {
+		t.Error(err)
+		return
+	}
+	ver := versions.Read(filepath.Join(testDir, "llpkgstore.json"))
 
 	err = actionFn("release-branch.cjson/v0.1.1", func(legacy bool) error {
 		return checkLegacyVersion(ver, pkg, "v0.1.2", legacy)
@@ -125,10 +152,8 @@ func TestLegacyVersion3(t *testing.T) {
 		  }
 		}
 	  }`
-	os.WriteFile("llpkg.cfg", []byte(testLLPkgConfig), 0755)
-	defer os.Remove("llpkg.cfg")
 
-	b := []byte(`{
+	testMappingTable := `{
 		"cjson": {
 			"versions" : {
 				"1.7.16": ["v0.1.0"],
@@ -136,17 +161,21 @@ func TestLegacyVersion3(t *testing.T) {
 				"1.8.18": ["v0.2.0", "v0.2.1"]
 			}
 		}
-	}`)
+	}`
 
-	os.WriteFile(".llpkgstore.json", []byte(b), 0755)
-	defer os.Remove(".llpkgstore.json")
-
-	pkg, err := llpkg.NewLLPkg("")
+	testDir, err := prepareEnv([]byte(testLLPkgConfig), []byte(testMappingTable))
 	if err != nil {
 		t.Error(err)
 		return
 	}
-	ver := versions.Read(".llpkgstore.json")
+	defer os.RemoveAll(testDir)
+
+	pkg, err := llpkg.NewLLPkg(testDir)
+	if err != nil {
+		t.Error(err)
+		return
+	}
+	ver := versions.Read(filepath.Join(testDir, "llpkgstore.json"))
 
 	err = actionFn("main", func(legacy bool) error {
 		return checkLegacyVersion(ver, pkg, "v0.3.0", legacy)
@@ -168,10 +197,8 @@ func TestLegacyVersion4(t *testing.T) {
 		  }
 		}
 	  }`
-	os.WriteFile("llpkg.cfg", []byte(testLLPkgConfig), 0755)
-	defer os.Remove("llpkg.cfg")
 
-	b := []byte(`{
+	testMappingTable := `{
 		"cjson": {
 			"versions" : {
 				"1.8.18": ["v0.2.0", "v0.2.1"],
@@ -179,17 +206,21 @@ func TestLegacyVersion4(t *testing.T) {
 				"1.7.18": ["v0.1.1", "v0.1.2"]
 			}
 		}
-	}`)
+	}`
 
-	os.WriteFile(".llpkgstore.json", []byte(b), 0755)
-	defer os.Remove(".llpkgstore.json")
-
-	pkg, err := llpkg.NewLLPkg("")
+	testDir, err := prepareEnv([]byte(testLLPkgConfig), []byte(testMappingTable))
 	if err != nil {
 		t.Error(err)
 		return
 	}
-	ver := versions.Read(".llpkgstore.json")
+	defer os.RemoveAll(testDir)
+
+	pkg, err := llpkg.NewLLPkg(testDir)
+	if err != nil {
+		t.Error(err)
+		return
+	}
+	ver := versions.Read(filepath.Join(testDir, "llpkgstore.json"))
 
 	err = actionFn("main", func(legacy bool) error {
 		return checkLegacyVersion(ver, pkg, "v0.0.1", legacy)
@@ -210,10 +241,8 @@ func TestLegacyVersion5(t *testing.T) {
 		  }
 		}
 	  }`
-	os.WriteFile("llpkg.cfg", []byte(testLLPkgConfig), 0755)
-	defer os.Remove("llpkg.cfg")
 
-	b := []byte(`{
+	testMappingTable := `{
 		"cjson": {
 			"versions" : {
 				"1.7.16": ["v0.1.0"],
@@ -221,17 +250,21 @@ func TestLegacyVersion5(t *testing.T) {
 				"1.8.18": ["v0.2.0", "v0.2.1"]
 			}
 		}
-	}`)
+	}`
 
-	os.WriteFile(".llpkgstore.json", []byte(b), 0755)
-	defer os.Remove(".llpkgstore.json")
-
-	pkg, err := llpkg.NewLLPkg("")
+	testDir, err := prepareEnv([]byte(testLLPkgConfig), []byte(testMappingTable))
 	if err != nil {
 		t.Error(err)
 		return
 	}
-	ver := versions.Read(".llpkgstore.json")
+	defer os.RemoveAll(testDir)
+
+	pkg, err := llpkg.NewLLPkg(testDir)
+	if err != nil {
+		t.Error(err)
+		return
+	}
+	ver := versions.Read(filepath.Join(testDir, "llpkgstore.json"))
 
 	err = actionFn("main", func(legacy bool) error {
 		return checkLegacyVersion(ver, pkg, "v0.1.1", legacy)
