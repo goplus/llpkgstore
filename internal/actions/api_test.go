@@ -55,62 +55,55 @@ func prepareEnv(llpkgConfig, mappingTable []byte) (testDir string, err error) {
 	return
 }
 
-func TestLegacyVersion1(t *testing.T) {
-	testLLPkgConfig := `{
-		"upstream": {
-		  "package": {
-			"name": "cjson",
-			"version": "1.7.17"
-		  }
-		}
-	  }`
+func TestLegacyVersion(t *testing.T) {
+	testCases := []struct {
+		name                string
+		branch              string
+		llpkgContent        string
+		mappedVersion       string
+		mappingTableContent string
+		wantErr             bool
+	}{
+		{
+			name:          "case1",
+			branch:        "main",
+			mappedVersion: "v0.1.1",
+			wantErr:       true,
+			llpkgContent: `{
+				"upstream": {
+				  "package": {
+					"name": "cjson",
+					"version": "1.7.17"
+				  }
+				}
+			  }`,
 
-	testMappingTable := `{
-		"cjson": {
-			"versions" : {
-				"1.7.16": ["v0.1.0"],
-				"1.7.18": ["v0.1.2", "v0.1.3"],
-				"1.8.18": ["v0.1.0", "v0.1.1"]
-			}
-		}
-	}`
+			mappingTableContent: `{
+				"cjson": {
+					"versions" : {
+						"1.7.16": ["v0.1.0"],
+						"1.7.18": ["v0.1.2", "v0.1.3"],
+						"1.8.18": ["v0.1.0", "v0.1.1"]
+					}
+				}
+			}`,
+		},
 
-	testDir, err := prepareEnv([]byte(testLLPkgConfig), []byte(testMappingTable))
-	if err != nil {
-		t.Error(err)
-		return
-	}
-	defer os.RemoveAll(testDir)
-
-	pkg, err := llpkg.NewLLPkg(testDir)
-	if err != nil {
-		t.Error(err)
-		return
-	}
-	ver := mappingtable.Read(filepath.Join(testDir, "llpkgstore.json"))
-
-	err = actionFn("main", func(legacy bool) error {
-		return checkLegacyVersion(ver, pkg, "v0.1.1", legacy)
-	})
-
-	if err == nil {
-		t.Errorf("unexpected behavior: %v", err)
-		return
-	}
-
-}
-
-func TestLegacyVersion2(t *testing.T) {
-	testLLPkgConfig := `{
+		{
+			name:          "case2",
+			branch:        "release-branch.cjson/v0.1.1",
+			mappedVersion: "v0.1.2",
+			wantErr:       false,
+			llpkgContent: `{
 		"upstream": {
 		  "package": {
 			"name": "cjson",
 			"version": "1.7.19"
 		  }
 		}
-	  }`
+	  }`,
 
-	testMappingTable := `{
+			mappingTableContent: `{
 		"cjson": {
 			"versions" : {
 				"1.8.18": ["v0.2.0", "v0.2.1"],
@@ -118,44 +111,24 @@ func TestLegacyVersion2(t *testing.T) {
 				"1.7.16: ["v1.1.0"]
 			}
 		}
-	}`
+	}`,
+		},
 
-	testDir, err := prepareEnv([]byte(testLLPkgConfig), []byte(testMappingTable))
-	if err != nil {
-		t.Error(err)
-		return
-	}
-	defer os.RemoveAll(testDir)
-
-	pkg, err := llpkg.NewLLPkg(testDir)
-	if err != nil {
-		t.Error(err)
-		return
-	}
-	ver := mappingtable.Read(filepath.Join(testDir, "llpkgstore.json"))
-
-	err = actionFn("release-branch.cjson/v0.1.1", func(legacy bool) error {
-		return checkLegacyVersion(ver, pkg, "v0.1.2", legacy)
-	})
-	isValid := err == nil
-
-	if !isValid {
-		t.Errorf("unexpected behavior: %v", err)
-		return
-	}
-}
-
-func TestLegacyVersion3(t *testing.T) {
-	testLLPkgConfig := `{
+		{
+			name:          "case3",
+			branch:        "main",
+			mappedVersion: "v0.3.0",
+			wantErr:       false,
+			llpkgContent: `{
 		"upstream": {
 		  "package": {
 			"name": "cjson",
 			"version": "1.9.1"
 		  }
 		}
-	  }`
+	  }`,
 
-	testMappingTable := `{
+			mappingTableContent: `{
 		"cjson": {
 			"versions" : {
 				"1.7.16": ["v0.1.0"],
@@ -163,44 +136,24 @@ func TestLegacyVersion3(t *testing.T) {
 				"1.8.18": ["v0.2.0", "v0.2.1"]
 			}
 		}
-	}`
+	}`,
+		},
 
-	testDir, err := prepareEnv([]byte(testLLPkgConfig), []byte(testMappingTable))
-	if err != nil {
-		t.Error(err)
-		return
-	}
-	defer os.RemoveAll(testDir)
-
-	pkg, err := llpkg.NewLLPkg(testDir)
-	if err != nil {
-		t.Error(err)
-		return
-	}
-	ver := mappingtable.Read(filepath.Join(testDir, "llpkgstore.json"))
-
-	err = actionFn("main", func(legacy bool) error {
-		return checkLegacyVersion(ver, pkg, "v0.3.0", legacy)
-	})
-	isValid := err == nil
-
-	if !isValid {
-		t.Errorf("unexpected behavior: %v", err)
-		return
-	}
-}
-
-func TestLegacyVersion4(t *testing.T) {
-	testLLPkgConfig := `{
+		{
+			name:          "case4",
+			branch:        "main",
+			mappedVersion: "v0.0.1",
+			wantErr:       true,
+			llpkgContent: `{
 		"upstream": {
 		  "package": {
 			"name": "cjson",
 			"version": "1.9.1"
 		  }
 		}
-	  }`
+	  }`,
 
-	testMappingTable := `{
+			mappingTableContent: `{
 		"cjson": {
 			"versions" : {
 				"1.8.18": ["v0.2.0", "v0.2.1"],
@@ -208,43 +161,24 @@ func TestLegacyVersion4(t *testing.T) {
 				"1.7.18": ["v0.1.1", "v0.1.2"]
 			}
 		}
-	}`
+	}`,
+		},
 
-	testDir, err := prepareEnv([]byte(testLLPkgConfig), []byte(testMappingTable))
-	if err != nil {
-		t.Error(err)
-		return
-	}
-	defer os.RemoveAll(testDir)
-
-	pkg, err := llpkg.NewLLPkg(testDir)
-	if err != nil {
-		t.Error(err)
-		return
-	}
-	ver := mappingtable.Read(filepath.Join(testDir, "llpkgstore.json"))
-
-	err = actionFn("main", func(legacy bool) error {
-		return checkLegacyVersion(ver, pkg, "v0.0.1", legacy)
-	})
-
-	if err == nil {
-		t.Errorf("unexpected behavior: %v", err)
-		return
-	}
-}
-
-func TestLegacyVersion5(t *testing.T) {
-	testLLPkgConfig := `{
+		{
+			name:          "case5",
+			branch:        "main",
+			mappedVersion: "v0.1.1",
+			wantErr:       true,
+			llpkgContent: `{
 		"upstream": {
 		  "package": {
 			"name": "cjson",
 			"version": "1.7.19"
 		  }
 		}
-	  }`
+	  }`,
 
-	testMappingTable := `{
+			mappingTableContent: `{
 		"cjson": {
 			"versions" : {
 				"1.7.16": ["v0.1.0"],
@@ -252,28 +186,37 @@ func TestLegacyVersion5(t *testing.T) {
 				"1.8.18": ["v0.2.0", "v0.2.1"]
 			}
 		}
-	}`
-
-	testDir, err := prepareEnv([]byte(testLLPkgConfig), []byte(testMappingTable))
-	if err != nil {
-		t.Error(err)
-		return
+	}`,
+		},
 	}
-	defer os.RemoveAll(testDir)
 
-	pkg, err := llpkg.NewLLPkg(testDir)
-	if err != nil {
-		t.Error(err)
-		return
+	for _, tt := range testCases {
+		t.Run(tt.name, func(t *testing.T) {
+			testDir, err := prepareEnv([]byte(tt.llpkgContent), []byte(tt.mappingTableContent))
+			if err != nil {
+				t.Error(err)
+				return
+			}
+			defer os.RemoveAll(testDir)
+
+			pkg, err := llpkg.NewLLPkg(testDir)
+			if err != nil {
+				t.Error(err)
+				return
+			}
+			ver := mappingtable.Read(filepath.Join(testDir, "llpkgstore.json"))
+
+			err = actionFn(tt.branch, func(legacy bool) error {
+				return checkLegacyVersion(ver, pkg, tt.mappedVersion, legacy)
+			})
+
+			if tt.wantErr && err == nil {
+				t.Error("unexpected no error")
+			}
+			if !tt.wantErr && err != nil {
+				t.Errorf("unexpected error: %v", err)
+			}
+		})
 	}
-	ver := mappingtable.Read(filepath.Join(testDir, "llpkgstore.json"))
 
-	err = actionFn("main", func(legacy bool) error {
-		return checkLegacyVersion(ver, pkg, "v0.1.1", legacy)
-	})
-
-	if err == nil {
-		t.Errorf("unexpected behavior: %v", err)
-		return
-	}
 }
