@@ -81,6 +81,7 @@ func (d *DefaultClient) Postprocessing() error {
 		return err
 	}
 
+	// the pr has merged, so we can read it.
 	pkg, err := llpkg.FromPackageName(clib)
 	if err != nil {
 		return err
@@ -132,6 +133,8 @@ func (d *DefaultClient) Release() error {
 	if err != nil {
 		return err
 	}
+
+	// the pr has merged, so we can read it.
 	pkg, err := llpkg.FromPackageName(clibName)
 	if err != nil {
 		return err
