@@ -50,6 +50,8 @@ func prepareEnv(llpkgConfig, mappingTable []byte) (testDir string, err error) {
 	os.WriteFile(filepath.Join(testDir, "go.mod"), []byte(`module cjson
 	go 1.22
 	`), 0644)
+
+	os.WriteFile(filepath.Join(testDir, "x.go"), []byte(`package cjson`), 0644)
 	return
 }
 
