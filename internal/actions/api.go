@@ -457,6 +457,10 @@ func (d *DefaultClient) uploadArtifactsToRelease(release *github.RepositoryRelea
 	defer cancel()
 
 	id, err := env.WorkflowRunID()
+	if err != nil {
+		return nil, err
+	}
+
 	artifacts, _, err := d.client.Actions.ListWorkflowRunArtifacts(ctx, d.owner, d.repo,
 		id, &github.ListOptions{})
 
