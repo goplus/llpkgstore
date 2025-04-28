@@ -8,7 +8,7 @@ import (
 	"testing"
 
 	"github.com/goplus/llpkgstore/internal/actions/llpkg"
-	"github.com/goplus/llpkgstore/internal/actions/versions"
+	"github.com/goplus/llpkgstore/internal/actions/mappingtable"
 )
 
 func TestHasTag(t *testing.T) {
@@ -85,7 +85,7 @@ func TestLegacyVersion1(t *testing.T) {
 		t.Error(err)
 		return
 	}
-	ver := versions.Read(filepath.Join(testDir, "llpkgstore.json"))
+	ver := mappingtable.Read(filepath.Join(testDir, "llpkgstore.json"))
 
 	err = actionFn("main", func(legacy bool) error {
 		return checkLegacyVersion(ver, pkg, "v0.1.1", legacy)
@@ -130,7 +130,7 @@ func TestLegacyVersion2(t *testing.T) {
 		t.Error(err)
 		return
 	}
-	ver := versions.Read(filepath.Join(testDir, "llpkgstore.json"))
+	ver := mappingtable.Read(filepath.Join(testDir, "llpkgstore.json"))
 
 	err = actionFn("release-branch.cjson/v0.1.1", func(legacy bool) error {
 		return checkLegacyVersion(ver, pkg, "v0.1.2", legacy)
@@ -175,7 +175,7 @@ func TestLegacyVersion3(t *testing.T) {
 		t.Error(err)
 		return
 	}
-	ver := versions.Read(filepath.Join(testDir, "llpkgstore.json"))
+	ver := mappingtable.Read(filepath.Join(testDir, "llpkgstore.json"))
 
 	err = actionFn("main", func(legacy bool) error {
 		return checkLegacyVersion(ver, pkg, "v0.3.0", legacy)
@@ -220,7 +220,7 @@ func TestLegacyVersion4(t *testing.T) {
 		t.Error(err)
 		return
 	}
-	ver := versions.Read(filepath.Join(testDir, "llpkgstore.json"))
+	ver := mappingtable.Read(filepath.Join(testDir, "llpkgstore.json"))
 
 	err = actionFn("main", func(legacy bool) error {
 		return checkLegacyVersion(ver, pkg, "v0.0.1", legacy)
@@ -264,7 +264,7 @@ func TestLegacyVersion5(t *testing.T) {
 		t.Error(err)
 		return
 	}
-	ver := versions.Read(filepath.Join(testDir, "llpkgstore.json"))
+	ver := mappingtable.Read(filepath.Join(testDir, "llpkgstore.json"))
 
 	err = actionFn("main", func(legacy bool) error {
 		return checkLegacyVersion(ver, pkg, "v0.1.1", legacy)

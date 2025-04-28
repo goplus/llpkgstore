@@ -13,7 +13,7 @@ func demoDir() (dir string, err error) {
 	}
 	// ../../../_demo
 
-	dir = filepath.Join(filepath.Dir(filepath.Dir(filepath.Dir(dir))), "_demo")
+	dir = filepath.Join("..", "..", "..", "_demo")
 	return
 }
 
@@ -48,61 +48,55 @@ func TestReadConfig(t *testing.T) {
 		t.Error(err)
 		return
 	}
+	testCases := []struct {
+		name         string
+		wantErr      bool
+		goModContent []byte
+	}{
+		{
+			name:    "with-version-suffix",
+			wantErr: false,
+			goModContent: []byte(`module github.com/goplus/llpkg/libcjson/v2
+
+			go 1.22.0
+			`),
+		},
+		{
+			name:    "without-version-suffix",
+			wantErr: false,
+			goModContent: []byte(`module github.com/goplus/llpkg/libcjson
+
+			go 1.22.0
+			`),
+		},
+		{
+			name:    "raw-package-name",
+			wantErr: false,
+			goModContent: []byte(`module libcjson
+
+			go 1.22.0
+			`),
+		},
+		{
+			name:         "wrong-go-mod",
+			wantErr:      true,
+			goModContent: []byte(`go 1.22.0`),
+		},
+	}
 	tempGoModFileName := filepath.Join(demoDir, "go.mod")
 
-	t.Run("with-version-suffix", func(t *testing.T) {
-		err := os.WriteFile(tempGoModFileName, []byte(`module github.com/goplus/llpkg/libcjson/v2
+	for _, tt := range testCases {
+		t.Run(tt.name, func(t *testing.T) {
+			err := os.WriteFile(tempGoModFileName, tt.goModContent, 0644)
+			if err != nil {
+				t.Error(err)
+				return
+			}
+			defer os.Remove(tempGoModFileName)
 
-		go 1.22.0
-		`), 0644)
-		if err != nil {
-			t.Error(err)
-			return
-		}
-		defer os.Remove(tempGoModFileName)
-
-		checkName(t, demoDir, false)
-	})
-
-	t.Run("without-version-suffix", func(t *testing.T) {
-		err := os.WriteFile(tempGoModFileName, []byte(`module github.com/goplus/llpkg/libcjson
-
-		go 1.22.0
-		`), 0644)
-		if err != nil {
-			t.Error(err)
-			return
-		}
-		defer os.Remove(tempGoModFileName)
-
-		checkName(t, demoDir, false)
-	})
-
-	t.Run("raw-package-name", func(t *testing.T) {
-		err := os.WriteFile(tempGoModFileName, []byte(`module libcjson
-
-		go 1.22.0
-		`), 0644)
-		if err != nil {
-			t.Error(err)
-			return
-		}
-		defer os.Remove(tempGoModFileName)
-
-		checkName(t, demoDir, false)
-
-	})
-
-	t.Run("wrong-go-mod", func(t *testing.T) {
-		err := os.WriteFile(tempGoModFileName, []byte(`go 1.22.0`), 0644)
-		if err != nil {
-			t.Error(err)
-			return
-		}
-
-		checkName(t, demoDir, true)
-	})
-
+			checkName(t, demoDir, false)
+		})
+	}
 	t.Run("no-go-mod", func(t *testing.T) {
 		checkName(t, demoDir, true)
 	})

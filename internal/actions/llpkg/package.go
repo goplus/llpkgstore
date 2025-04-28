@@ -47,19 +47,23 @@ func NewLLPkg(packagePath string) (*LLPkg, error) {
 	return l, nil
 }
 
+func FromPackageName(pkgName PackageName) (*LLPkg, error) {
+	return NewLLPkg(pkgName.String())
+}
+
 // Returns the name of the package derived from the go.mod module path
-func (p LLPkg) Name() string {
-	return p.packageName
+func (p LLPkg) Name() PackageName {
+	return PackageName(p.packageName)
 }
 
 // Returns the name from llpkg.cfg config
-func (p LLPkg) ClibName() string {
-	return p.cfg.Upstream.Package.Name
+func (p LLPkg) ClibName() ClibName {
+	return ClibName(p.cfg.Upstream.Package.Name)
 }
 
 // Returns the version from llpkg.cfg config
-func (p LLPkg) ClibVersion() string {
-	return p.cfg.Upstream.Package.Version
+func (p LLPkg) ClibVersion() ClibVersion {
+	return ClibVersion(p.cfg.Upstream.Package.Version)
 }
 
 // Retrieves the upstream source configuration for this package

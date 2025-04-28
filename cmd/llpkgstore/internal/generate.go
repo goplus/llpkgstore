@@ -9,6 +9,7 @@ import (
 
 	"github.com/goplus/llpkgstore/config"
 	"github.com/goplus/llpkgstore/internal/actions/generator/llcppg"
+	"github.com/goplus/llpkgstore/internal/actions/llpkg"
 	"github.com/goplus/llpkgstore/internal/file"
 	"github.com/goplus/llpkgstore/internal/pc"
 	"github.com/spf13/cobra"
@@ -65,7 +66,7 @@ func runLLCppgGenerateWithDir(dir string) error {
 		}
 	}
 
-	generator := llcppg.New(dir, filepath.Base(dir), tempDir)
+	generator := llcppg.New(dir, tempDir, llpkg.PackageName(filepath.Base(dir)))
 
 	return generator.Generate(dir)
 }

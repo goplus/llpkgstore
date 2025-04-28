@@ -15,6 +15,7 @@ import (
 
 	"github.com/goplus/llpkgstore/internal/actions/env"
 	"github.com/goplus/llpkgstore/internal/actions/llpkg"
+	"github.com/goplus/llpkgstore/internal/actions/mappingtable"
 	"github.com/goplus/llpkgstore/internal/actions/versions"
 	"github.com/goplus/llpkgstore/internal/file"
 	"github.com/goplus/llpkgstore/internal/pc"
@@ -99,13 +100,13 @@ func shaFromTag(tag string) string {
 // parseMappedVersion splits the mapped version string into library name and version.
 // Input format: "clib/semver" where semver starts with 'v'
 // Panics if input format is invalid or version isn't valid semantic version
-func parseMappedVersion(version string) (clib, mappedVersion string, err error) {
+func parseMappedVersion(version string) (packageName llpkg.PackageName, mappedVersion string, err error) {
 	arr := strings.Split(version, "/")
 	if len(arr) != 2 {
 		err = fmt.Errorf("actions: invalid mapped version format")
 		return
 	}
-	clib, mappedVersion = arr[0], arr[1]
+	packageName, mappedVersion = llpkg.PackageName(arr[0]), arr[1]
 
 	if !semver.IsValid(mappedVersion) {
 		err = fmt.Errorf("actions: invalid mapped version format: mappedVersion is not a semver")
@@ -134,7 +135,7 @@ func isLLPkgRoot(path string) bool {
 
 // checkLegacyVersion validates versioning strategy for legacy package submissions
 // Ensures semantic versioning compliance and proper branch maintenance strategy
-func checkLegacyVersion(ver *versions.Versions, pkg *llpkg.LLPkg, mappedVersion string, isLegacy bool) error {
+func checkLegacyVersion(ver *mappingtable.Versions, pkg *llpkg.LLPkg, mappedVersion string, isLegacy bool) error {
 	clibName := pkg.ClibName()
 	clibVersion := pkg.ClibVersion()
 
@@ -142,7 +143,7 @@ func checkLegacyVersion(ver *versions.Versions, pkg *llpkg.LLPkg, mappedVersion 
 		return fmt.Errorf("actions: repeat semver %s", mappedVersion)
 	}
 	vers := ver.CVersions(clibName)
-	currentVersion := versions.ToSemVer(clibVersion)
+	currentVersion := clibVersion.ToSemVer()
 
 	// skip when we're the only latest version or C version doesn't follow semver.
 	if len(vers) == 0 || !semver.IsValid(currentVersion) {

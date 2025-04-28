@@ -17,6 +17,7 @@ import (
 	"github.com/google/go-github/v69/github"
 	"github.com/goplus/llpkgstore/internal/actions/env"
 	"github.com/goplus/llpkgstore/internal/actions/llpkg"
+	"github.com/goplus/llpkgstore/internal/actions/mappingtable"
 	"github.com/goplus/llpkgstore/internal/actions/versions"
 	"golang.org/x/sync/errgroup"
 )
@@ -30,18 +31,11 @@ const (
 	regexString          = `Release-as:\s%s/v(?P<major>0|[1-9]\d*)\.(?P<minor>0|[1-9]\d*)\.(?P<patch>0|[1-9]\d*)(?:-(?P<prerelease>(?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*)(?:\.(?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*))*))?(?:\+(?P<buildmetadata>[0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?`
 )
 
-// regex compiles a regular expression pattern to detect "Release-as" directives in commit messages
-// Parameters:
-//
-//	packageName: Name of the package to format into the regex pattern
-//
-// Returns:
-//
-//	*regexp.Regexp: Compiled regular expression for version parsing
-func regex(packageName string) *regexp.Regexp {
+// compileRawCommitVersionRegex compiles a regular expression pattern to detect "Release-as" directives in commit messages
+func compileRawCommitVersionRegex(packageName llpkg.PackageName) *regexp.Regexp {
 	// format: Release-as: clib/semver(with v prefix)
 	// Must have one space in the end of Release-as:
-	return regexp.MustCompile(fmt.Sprintf(regexString, packageName))
+	return regexp.MustCompile(fmt.Sprintf(regexString, packageName.String()))
 }
 
 func binaryZip(packageName string) string {
@@ -245,7 +239,7 @@ func (d *DefaultClient) removeLabel(labelName string) error {
 //
 //	If no valid version found in PR commits
 func (d *DefaultClient) checkMappedVersion(pkg *llpkg.LLPkg) (mappedVersion string, err error) {
-	matchMappedVersion := regex(pkg.Name())
+	matchMappedVersion := compileRawCommitVersionRegex(pkg.Name())
 
 	allCommits, err := d.currentPRCommit()
 	if err != nil {
@@ -307,7 +301,7 @@ func (d *DefaultClient) mappedVersion() (string, error) {
 	message := commit.GetCommit().GetMessage()
 
 	// parse the mapped version
-	mappedVersion := regex(".*").FindString(message)
+	mappedVersion := compileRawCommitVersionRegex(llpkg.PackageName(".*")).FindString(message)
 	// mapped version not found, a normal commit?
 	if mappedVersion == "" {
 		return "", ErrNoMappedVersion
@@ -510,7 +504,7 @@ func (d *DefaultClient) removeBranch(branchName string) error {
 //
 //	ver: Version store object
 //	cfg: Package configuration
-func (d *DefaultClient) checkVersion(ver *versions.Versions, pkg *llpkg.LLPkg) error {
+func (d *DefaultClient) checkVersion(ver *mappingtable.Versions, pkg *llpkg.LLPkg) error {
 	// 4. Check MappedVersion
 	version, err := d.checkMappedVersion(pkg)
 	if err != nil {
@@ -548,7 +542,7 @@ func (d *DefaultClient) CheckPR() ([]string, error) {
 
 	var allPaths []string
 
-	ver := versions.Read("llpkgstore.json")
+	ver := mappingtable.Read("llpkgstore.json")
 
 	for path := range pathMap {
 		if !isLLPkgRoot(path) {
@@ -598,14 +592,14 @@ func (d *DefaultClient) Postprocessing() error {
 		return err
 	}
 
-	pkg, err := llpkg.NewLLPkg(clib)
+	pkg, err := llpkg.FromPackageName(clib)
 	if err != nil {
 		return err
 	}
 
 	// write it to llpkgstore.json
-	ver := versions.Read("llpkgstore.json")
-	ver.Write(clib, pkg.ClibName(), mappedVersion)
+	ver := mappingtable.Read("llpkgstore.json")
+	ver.Write(pkg.ClibName(), pkg.ClibVersion(), mappedVersion)
 
 	if hasTag(version) {
 		return fmt.Errorf("actions: tag has already existed")
@@ -649,7 +643,7 @@ func (d *DefaultClient) Release() error {
 	if err != nil {
 		return err
 	}
-	pkg, err := llpkg.NewLLPkg(clibName)
+	pkg, err := llpkg.FromPackageName(clibName)
 	if err != nil {
 		return err
 	}
@@ -692,7 +686,7 @@ func (d *DefaultClient) CreateBranchFromLabel(labelName string) error {
 	if err != nil {
 		return err
 	}
-	pkg, err := llpkg.NewLLPkg(clibName)
+	pkg, err := llpkg.FromPackageName(clibName)
 	if err != nil {
 		return err
 	}
@@ -702,7 +696,7 @@ func (d *DefaultClient) CreateBranchFromLabel(labelName string) error {
 	// according to branch maintenance strategy
 
 	// get latest version of the clib
-	ver := versions.Read("llpkgstore.json")
+	ver := mappingtable.Read("llpkgstore.json")
 
 	cversions := ver.CVersions(pkg.ClibName())
 	if len(cversions) == 0 {
