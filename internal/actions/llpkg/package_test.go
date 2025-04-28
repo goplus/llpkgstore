@@ -94,7 +94,7 @@ func TestReadConfig(t *testing.T) {
 			}
 			defer os.Remove(tempGoModFileName)
 
-			checkName(t, demoDir, false)
+			checkName(t, demoDir, tt.wantErr)
 		})
 	}
 	t.Run("no-go-mod", func(t *testing.T) {
