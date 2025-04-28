@@ -4,6 +4,8 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/goplus/llpkgstore/internal/file"
 )
 
 func demoDir() (dir string, err error) {
@@ -48,56 +50,56 @@ func TestReadConfig(t *testing.T) {
 		t.Error(err)
 		return
 	}
-	testCases := []struct {
-		name         string
-		wantErr      bool
-		goModContent []byte
-	}{
-		{
-			name:    "with-version-suffix",
-			wantErr: false,
-			goModContent: []byte(`module github.com/goplus/llpkg/libcjson/v2
 
-			go 1.22.0
-			`),
-		},
-		{
-			name:    "without-version-suffix",
-			wantErr: false,
-			goModContent: []byte(`module github.com/goplus/llpkg/libcjson
+	t.Run("one-go-file", func(t *testing.T) {
+		tempGoFileName := filepath.Join(demoDir, "x.go")
+		err := os.WriteFile(tempGoFileName, []byte(`package libcjson`), 0644)
+		if err != nil {
+			t.Error(err)
+			return
+		}
+		defer file.RemovePattern(filepath.Join(demoDir, "*.go"))
 
-			go 1.22.0
-			`),
-		},
-		{
-			name:    "raw-package-name",
-			wantErr: false,
-			goModContent: []byte(`module libcjson
+		checkName(t, demoDir, false)
+	})
 
-			go 1.22.0
-			`),
-		},
-		{
-			name:         "wrong-go-mod",
-			wantErr:      true,
-			goModContent: []byte(`go 1.22.0`),
-		},
-	}
-	tempGoModFileName := filepath.Join(demoDir, "go.mod")
+	t.Run("multi-go-files", func(t *testing.T) {
+		tempGoFileName1 := filepath.Join(demoDir, "a.go")
+		err := os.WriteFile(tempGoFileName1, []byte(`package libcjson`), 0644)
+		if err != nil {
+			t.Error(err)
+			return
+		}
+		tempGoFileName2 := filepath.Join(demoDir, "x.go")
+		err = os.WriteFile(tempGoFileName2, []byte(`package cjson`), 0644)
+		if err != nil {
+			t.Error(err)
+			return
+		}
+		defer file.RemovePattern(filepath.Join(demoDir, "*.go"))
 
-	for _, tt := range testCases {
-		t.Run(tt.name, func(t *testing.T) {
-			err := os.WriteFile(tempGoModFileName, tt.goModContent, 0644)
-			if err != nil {
-				t.Error(err)
-				return
-			}
-			defer os.Remove(tempGoModFileName)
+		checkName(t, demoDir, false)
+	})
 
-			checkName(t, demoDir, tt.wantErr)
-		})
-	}
-	t.Run("no-go-mod", func(t *testing.T) {
+	t.Run("multi-go-files-fallback", func(t *testing.T) {
+		tempGoFileName1 := filepath.Join(demoDir, "a.go")
+		err := os.WriteFile(tempGoFileName1, []byte(``), 0644)
+		if err != nil {
+			t.Error(err)
+			return
+		}
+		tempGoFileName2 := filepath.Join(demoDir, "x.go")
+		err = os.WriteFile(tempGoFileName2, []byte(`package libcjson`), 0644)
+		if err != nil {
+			t.Error(err)
+			return
+		}
+		defer file.RemovePattern(filepath.Join(demoDir, "*.go"))
+
+		checkName(t, demoDir, false)
+	})
+
+	t.Run("no-go-files", func(t *testing.T) {
 		checkName(t, demoDir, true)
 	})
 

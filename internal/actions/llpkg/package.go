@@ -4,17 +4,25 @@ package llpkg
 import (
 	"errors"
 	"fmt"
+	"go/parser"
+	"go/token"
 	"os"
-	"path"
 	"path/filepath"
 
 	"github.com/goplus/llpkgstore/config"
 	"github.com/goplus/llpkgstore/upstream"
-	"golang.org/x/mod/modfile"
-	"golang.org/x/mod/semver"
 )
 
-var ErrNoModulePath = errors.New("llpkg: no module path")
+var ErrWrongPackagePath = errors.New("llpkg: wrong package path")
+
+func parsePackageName(goFile string) (string, error) {
+	fset := token.NewFileSet()
+	file, err := parser.ParseFile(fset, goFile, nil, parser.PackageClauseOnly)
+	if err != nil {
+		return "", err
+	}
+	return file.Name.Name, nil
+}
 
 // Wraps an error with the "llpkg" prefix for better context
 func wrapLLPkgError(err error) error {
@@ -79,32 +87,25 @@ func (p *LLPkg) readPackageConfig() (err error) {
 		err = wrapLLPkgError(err)
 		return
 	}
-	goModFileName := filepath.Join(p.packagePath, "go.mod")
+	goFiles, _ := filepath.Glob(filepath.Join(p.packagePath, "*.go"))
 
-	goModContent, err := os.ReadFile(goModFileName)
-	if err != nil {
-		err = wrapLLPkgError(err)
+	if len(goFiles) == 0 {
+		err = ErrWrongPackagePath
 		return
 	}
-	modFile, err := modfile.Parse(goModFileName, goModContent, nil)
-	if err != nil {
-		err = wrapLLPkgError(err)
-		return
-	}
-	if modFile.Module == nil {
-		err = ErrNoModulePath
-		return
-	}
-	packageName := path.Base(modFile.Module.Mod.Path)
 
-	if semver.IsValid(packageName) {
-		// step forward if the last element is version
-		// exmaple:
-		// github.com/goplus/llpkg/cjson/v2
-		// got v2
-		// step forward: github.com/goplus/llpkg/cjson
-		// got: cjson
-		packageName = path.Base(path.Dir(modFile.Module.Mod.Path))
+	var packageName string
+
+	for _, goFile := range goFiles {
+		packageName, err = parsePackageName(goFile)
+		if packageName != "" {
+			break
+		}
+	}
+
+	if packageName == "" {
+		err = ErrWrongPackagePath
+		return
 	}
 
 	p.cfg = cfg
