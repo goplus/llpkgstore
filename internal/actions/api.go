@@ -30,10 +30,10 @@ const (
 )
 
 // compileRawCommitVersionRegex compiles a regular expression pattern to detect "Release-as" directives in commit messages
-func compileRawCommitVersionRegex(packageName llpkg.PackageName) *regexp.Regexp {
+func compileRawCommitVersionRegex(packageNamePattern string) *regexp.Regexp {
 	// format: Release-as: clib/semver(with v prefix)
 	// Must have one space in the end of Release-as:
-	return regexp.MustCompile(fmt.Sprintf(regexString, packageName.String()))
+	return regexp.MustCompile(fmt.Sprintf(regexString, packageNamePattern))
 }
 
 func binaryZip(packageName string) string {
@@ -237,7 +237,7 @@ func (d *DefaultClient) removeLabel(labelName string) error {
 //
 //	If no valid version found in PR commits
 func (d *DefaultClient) checkMappedVersion(pkg *llpkg.LLPkg) (mappedVersion string, err error) {
-	matchMappedVersion := compileRawCommitVersionRegex(pkg.Name())
+	matchMappedVersion := compileRawCommitVersionRegex(pkg.Name().String())
 
 	allCommits, err := d.currentPRCommit()
 	if err != nil {
@@ -299,7 +299,7 @@ func (d *DefaultClient) mappedVersion() (string, error) {
 	message := commit.GetCommit().GetMessage()
 
 	// parse the mapped version
-	mappedVersion := compileRawCommitVersionRegex(llpkg.PackageName(".*")).FindString(message)
+	mappedVersion := compileRawCommitVersionRegex(".*").FindString(message)
 	// mapped version not found, a normal commit?
 	if mappedVersion == "" {
 		return "", ErrNoMappedVersion
