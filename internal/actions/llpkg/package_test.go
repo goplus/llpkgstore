@@ -11,9 +11,7 @@ func demoDir() (dir string, err error) {
 	if err != nil {
 		return
 	}
-	// ../../../_demo
-
-	dir = filepath.Join(filepath.Dir(filepath.Dir(filepath.Dir(dir))), "_demo")
+	return filepath.Join(dir, "..", "..", "..", "_demo"), nil
 	return
 }
 
