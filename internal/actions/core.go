@@ -105,7 +105,7 @@ func (d *DefaultClient) Postprocessing() error {
 		return err
 	}
 
-	_, err = d.uploadArtifactsToRelease(release)
+	err = d.uploadArtifactsToRelease(release)
 	if err != nil {
 		return err
 	}

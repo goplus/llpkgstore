@@ -3,12 +3,10 @@ package actions
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"io"
 	"mime"
 	"net/http"
-	"os"
 	"regexp"
 	"strings"
 	"time"
@@ -442,7 +440,7 @@ func (d *DefaultClient) uploadArtifact(artifactID int64, release *github.Reposit
 
 	fileName, ok := params["filename"]
 	if !ok {
-		return errors.New("actions: no filename found in Content-Disposition")
+		return fmt.Errorf("actions: no filename found in Content-Disposition")
 	}
 
 	fmt.Printf("Upload %s to %s\n", fileName, release.GetName())
@@ -450,24 +448,24 @@ func (d *DefaultClient) uploadArtifact(artifactID int64, release *github.Reposit
 	return d.uploadToRelease(fileName, resp.ContentLength, resp.Body, release)
 }
 
-func (d *DefaultClient) uploadArtifactsToRelease(release *github.RepositoryRelease) (files []*os.File, err error) {
+func (d *DefaultClient) uploadArtifactsToRelease(release *github.RepositoryRelease) error {
 	ctx, cancel := context.WithTimeout(context.TODO(), 30*time.Second)
 	defer cancel()
 
 	id, err := env.WorkflowRunID()
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	artifacts, _, err := d.client.Actions.ListWorkflowRunArtifacts(ctx, d.owner, d.repo,
 		id, &github.ListOptions{})
 
 	if err != nil {
-		return nil, wrapActionError(err)
+		return wrapActionError(err)
 	}
 
 	if artifacts.GetTotalCount() == 0 {
-		return nil, errors.New("actions: no artifact found")
+		return fmt.Errorf("actions: no artifact found")
 	}
 
 	errGroup, _ := errgroup.WithContext(context.TODO())
@@ -481,7 +479,7 @@ func (d *DefaultClient) uploadArtifactsToRelease(release *github.RepositoryRelea
 		})
 	}
 
-	return nil, errGroup.Wait()
+	return errGroup.Wait()
 }
 
 // removeBranch deletes a branch from the repository

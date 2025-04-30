@@ -1,4 +1,3 @@
-// Package llpkg provides utilities for managing language-linked packages (LLPkgs)
 package llpkg
 
 import (
