@@ -7,7 +7,7 @@ import (
 
 var postProcessingCmd = &cobra.Command{
 	Use:   "postprocessing",
-	Short: "Verify a PR",
+	Short: "Process merged PR",
 	Long:  ``,
 	RunE:  runPostProcessingCmd,
 }
