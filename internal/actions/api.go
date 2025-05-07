@@ -529,9 +529,9 @@ func (d *DefaultClient) commitMappingTable(ver *mappingtable.Versions) error {
 		return err
 	}
 	// ignore error if created
-	d.createTag("mapping-table", sha)
+	d.createTag("_mappingtable", sha)
 
-	release, err := d.createReleaseByTag("mapping-table")
+	release, err := d.createReleaseByTag("_mappingtable")
 	if err != nil {
 		return err
 	}
