@@ -522,3 +522,21 @@ func (d *DefaultClient) checkVersion(ver *mappingtable.Versions, pkg *llpkg.LLPk
 	}
 	return checkLegacyVersion(ver, pkg, mappedVersion, isLegacy)
 }
+
+func (d *DefaultClient) commitMappingTable(ver *mappingtable.Versions) error {
+	sha, err := headSHA()
+	if err != nil {
+		return err
+	}
+	// ignore error if created
+	d.createTag("mapping-table", sha)
+
+	release, err := d.createReleaseByTag("mapping-table")
+	if err != nil {
+		return err
+	}
+
+	buf := strings.NewReader(ver.String())
+
+	return d.uploadToRelease("llpkgstore.json", buf.Size(), buf, release)
+}

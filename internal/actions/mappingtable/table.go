@@ -1,17 +1,22 @@
 package mappingtable
 
 import (
+	"context"
 	"encoding/json"
 	"io"
 	"log"
+	"net/http"
 	"os"
 	"slices"
+	"time"
 
 	"github.com/goplus/llpkgstore/internal/actions/llpkg"
 	vrs "github.com/goplus/llpkgstore/internal/actions/versions"
 	"github.com/goplus/llpkgstore/metadata"
 	"golang.org/x/mod/semver"
 )
+
+const _releaseSource = "https://github.com/goplus/llpkg/releases/download/_mappingtable/llpkgstore.json"
 
 // Versions is a mapping table implement for Github Action only.
 // It's recommend to use another implement in llgo for common usage.
@@ -52,6 +57,40 @@ func Read(fileName string) *Versions {
 		panic(err)
 	}
 
+	return readFromBytes(b, f.Name())
+}
+
+func FromRelease() (table *Versions, isCreated bool, err error) {
+	ctx, cancel := context.WithTimeout(context.TODO(), 30*time.Second)
+	defer cancel()
+
+	req, err := http.NewRequestWithContext(ctx, "GET", _releaseSource, nil)
+	if err != nil {
+		return
+	}
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return
+	}
+	defer resp.Body.Close()
+	// if specified release is not created yet, return a blank mapping table.
+	if resp.StatusCode == http.StatusNotFound {
+		table = readFromBytes(nil, "llpkgstore.json")
+		return
+	}
+
+	b, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return
+	}
+
+	isCreated = true
+	table = readFromBytes(b, "llpkgstore.json")
+	return
+}
+
+func readFromBytes(b []byte, fileName string) *Versions {
 	m := metadata.MetadataMap{}
 
 	if len(b) > 0 {
@@ -60,7 +99,7 @@ func Read(fileName string) *Versions {
 
 	return &Versions{
 		MetadataMap: m,
-		fileName:    f.Name(),
+		fileName:    fileName,
 	}
 }
 

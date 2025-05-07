@@ -27,6 +27,19 @@ func TestHasTag(t *testing.T) {
 	}
 }
 
+func TestHeadSHA(t *testing.T) {
+	sha, err := headSHA()
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+		return
+	}
+
+	if sha != "6d38ce6" {
+		t.Errorf("unexpected sha: got %s want %s", sha, "6d38ce6")
+
+	}
+}
+
 func actionFn(branchName string, fn func(legacy bool) error) error {
 	return fn(strings.HasPrefix(branchName, BranchPrefix))
 }

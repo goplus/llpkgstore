@@ -8,7 +8,6 @@ import (
 
 	"github.com/goplus/llpkgstore/internal/actions/env"
 	"github.com/goplus/llpkgstore/internal/actions/llpkg"
-	"github.com/goplus/llpkgstore/internal/actions/mappingtable"
 	"github.com/goplus/llpkgstore/internal/actions/versions"
 )
 
@@ -31,7 +30,10 @@ func (d *DefaultClient) CheckPR() ([]string, error) {
 
 	var allPaths []string
 
-	ver := mappingtable.Read("llpkgstore.json")
+	ver, err := readMappingTableCompatible()
+	if err != nil {
+		return nil, err
+	}
 
 	for path := range pathMap {
 		if !isLLPkgRoot(path) {
@@ -87,15 +89,24 @@ func (d *DefaultClient) Postprocessing() error {
 		return err
 	}
 
-	// write it to llpkgstore.json
-	ver := mappingtable.Read("llpkgstore.json")
-	ver.Write(pkg.ClibName(), pkg.ClibVersion(), mappedVersion)
-
 	if hasTag(version) {
 		return fmt.Errorf("actions: tag has already existed")
 	}
 
 	if err := d.createTag(version, sha); err != nil {
+		return err
+	}
+
+	// write it to llpkgstore.json
+	ver, err := readMappingTableCompatible()
+	if err != nil {
+		return err
+	}
+	ver.Write(pkg.ClibName(), pkg.ClibVersion(), mappedVersion)
+
+	// commit changes
+	err = d.commitMappingTable(ver)
+	if err != nil {
 		return err
 	}
 
@@ -119,7 +130,6 @@ func (d *DefaultClient) Postprocessing() error {
 		err = d.removeBranch(branchName)
 	}
 	return err
-	// move to website in Github Action...
 }
 
 // Release must be called before Postprocessing
@@ -188,7 +198,10 @@ func (d *DefaultClient) CreateBranchFromLabel(labelName string) error {
 	// according to branch maintenance strategy
 
 	// get latest version of the clib
-	ver := mappingtable.Read("llpkgstore.json")
+	ver, err := readMappingTableCompatible()
+	if err != nil {
+		return err
+	}
 
 	cversions := ver.CVersions(pkg.ClibName())
 	if len(cversions) == 0 {

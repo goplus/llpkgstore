@@ -2,6 +2,7 @@ package actions
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
 	"os"
@@ -95,6 +96,14 @@ func shaFromTag(tag string) string {
 		log.Fatalf("cannot find a tag: %s %s", tag, string(ret))
 	}
 	return strings.TrimSpace(string(ret))
+}
+
+func headSHA() (string, error) {
+	ret, err := exec.Command("git", "rev-list", "--max-parents", "0", "--abbrev-commit", "HEAD").CombinedOutput()
+	if err != nil {
+		return "", errors.New(string(ret))
+	}
+	return strings.TrimSpace(string(ret)), nil
 }
 
 // parseMappedVersion splits the mapped version string into library name and version.
@@ -210,6 +219,20 @@ func checkLegacyVersion(ver *mappingtable.Versions, pkg *llpkg.LLPkg, mappedVers
 		return fmt.Errorf("mapped version should not less than the legacy one")
 	}
 	return nil
+}
+
+func readMappingTableCompatible() (*mappingtable.Versions, error) {
+	ver, created, err := mappingtable.FromRelease()
+	if err != nil {
+		return nil, err
+	}
+	// if specified release that stores `llpkgstore.json` has created, read llpkgstore.json from release.
+	// otherwise, read it from github pages for compatibility
+	if created {
+		return ver, nil
+	}
+	// fallback to legacy gh-pages
+	return mappingtable.Read("llpkgstore.json"), nil
 }
 
 func BuildBinaryZip(uc *upstream.Upstream) (zipFileName, zipFilePath string, err error) {
