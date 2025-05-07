@@ -7,7 +7,7 @@ import (
 
 var issueCloseCmd = &cobra.Command{
 	Use:   "issueclose",
-	Short: "Legacy version maintenance on label creating",
+	Short: "Clean up resources after issue closure",
 	Long:  ``,
 
 	RunE: runIssueCloseCmd,

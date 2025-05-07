@@ -16,7 +16,7 @@ import (
 
 var generateCmd = &cobra.Command{
 	Use:   "generate",
-	Short: "PR Verification",
+	Short: "Generate LLGo bindings",
 	Long:  ``,
 	RunE:  runLLCppgGenerate,
 }

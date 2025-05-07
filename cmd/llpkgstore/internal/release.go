@@ -7,7 +7,7 @@ import (
 
 var releaseCmd = &cobra.Command{
 	Use:   "release",
-	Short: "Verify a PR",
+	Short: "Build and upload binary packages",
 	Long:  ``,
 	RunE:  runReleaseCmd,
 }
