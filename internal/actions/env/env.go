@@ -112,9 +112,6 @@ func WorkflowRunID() (id int64, err error) {
 		return
 	}
 	id, err = strconv.ParseInt(runId, 10, 64)
-	if err != nil {
-		return
-	}
 	return
 }
 
