@@ -143,7 +143,7 @@ func checkLegacyVersion(ver *versions.Versions, cfg config.LLPkgConfig, mappedVe
 
 	latestVersion := vers[0]
 
-	isLatest := semver.Compare(currentVersion, latestVersion) > 0
+	isLatest := semver.Compare(currentVersion, latestVersion) >= 0
 	// fast-path: we're the latest version
 	if isLatest {
 		// case1: we're the latest version, but mapped version is not latest, invalid.
