@@ -141,8 +141,11 @@ func testDependency(t *testing.T, config map[string]string, pkg upstream.Package
 	}
 	sort.Sort(packageSort(ver))
 
-	if !reflect.DeepEqual(ver, expectedDeps) {
-		t.Errorf("unexpected dependency for sdl: want %v got %v", expectedDeps, ver)
+	for i, expectedPkg := range expectedDeps {
+		// skip checking version of deps, because they may be upgraded
+		if expectedPkg.Name != ver[i].Name {
+			t.Errorf("unexpected dependency for sdl: want %v got %v", expectedDeps, ver)
+		}
 	}
 }
 
