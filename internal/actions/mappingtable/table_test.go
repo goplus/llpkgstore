@@ -1,4 +1,4 @@
-package versions
+package mappingtable
 
 import (
 	"bytes"
