@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/goplus/llpkgstore/internal/actions/generator"
+	"github.com/goplus/llpkgstore/internal/actions/llpkg"
 	"github.com/goplus/llpkgstore/internal/file"
 	"github.com/goplus/llpkgstore/internal/hashutils"
 	"github.com/goplus/llpkgstore/internal/pc"
@@ -67,17 +68,17 @@ func isExitedUnexpectedly(err error) bool {
 type llcppgGenerator struct {
 	dir         string // llcppg.cfg abs path
 	pcDir       string
-	packageName string
+	packageName llpkg.PackageName
 }
 
-func New(dir, packageName, pcDir string) generator.Generator {
+func New(dir, pcDir string, packageName llpkg.PackageName) generator.Generator {
 	return &llcppgGenerator{dir: dir, packageName: packageName, pcDir: pcDir}
 }
 
 // normalizeModulePath returns a normalized module path like
 // cjson => github.com/goplus/llpkg/cjson
 func (l *llcppgGenerator) normalizeModulePath() string {
-	return goplusRepo + l.packageName
+	return goplusRepo + l.packageName.String()
 }
 
 func (l *llcppgGenerator) findSymbJSON() string {
@@ -134,7 +135,7 @@ func (l *llcppgGenerator) Generate(toDir string) error {
 		return errors.Join(ErrLLCppgGenerate, err)
 	}
 	// check output again
-	generatedPath := filepath.Join(path, l.packageName)
+	generatedPath := filepath.Join(path, l.packageName.String())
 	if _, err := os.Stat(generatedPath); os.IsNotExist(err) {
 		return errors.Join(ErrLLCppgCheck, errors.New("generate fail"))
 	}

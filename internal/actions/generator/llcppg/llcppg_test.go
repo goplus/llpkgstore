@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/goplus/llpkgstore/config"
+	"github.com/goplus/llpkgstore/internal/actions/llpkg"
 	"github.com/goplus/llpkgstore/internal/hashutils"
 	"golang.org/x/mod/modfile"
 )
@@ -125,7 +126,7 @@ func TestLLCppg(t *testing.T) {
 	os.Mkdir("testgenerate", 0777)
 	defer os.RemoveAll("testgenerate")
 	path, _ := filepath.Abs("testgenerate")
-	generator := New(path, "cjson", path)
+	generator := New(path, path, llpkg.PackageName("cjson"))
 
 	os.WriteFile("testgenerate/llcppg.cfg", []byte(testLLCppgConfig), 0755)
 	os.WriteFile("testgenerate/llpkg.cfg", []byte(testLLPkgConfig), 0755)

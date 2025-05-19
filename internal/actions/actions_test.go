@@ -10,15 +10,24 @@ import (
 	"github.com/goplus/llpkgstore/config"
 )
 
+func demoDir() (dir string, err error) {
+	dir, err = os.Getwd()
+	if err != nil {
+		return
+	}
+	// ../../_demo
+
+	dir = filepath.Join("..", "..", "_demo")
+	return
+}
+
 func TestBuildBinaryZip(t *testing.T) {
-	dir, err := os.Getwd()
+	demoDir, err := demoDir()
 	if err != nil {
 		t.Error(err)
 		return
 	}
 	// ../../_demo
-
-	demoDir := filepath.Join(filepath.Dir(filepath.Dir(dir)), "_demo")
 
 	cfg, err := config.ParseLLPkgConfig(filepath.Join(demoDir, "llpkg.cfg"))
 	if err != nil {
