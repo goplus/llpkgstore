@@ -5,12 +5,14 @@ import (
 
 	"github.com/goplus/llpkgstore/upstream"
 	"github.com/goplus/llpkgstore/upstream/installer/conan"
+	"github.com/goplus/llpkgstore/upstream/installer/pip"
 )
 
-var ValidInstallers = []string{"conan"}
+var ValidInstallers = []string{"conan", "pip"}
 
 // LLPkgConfig represents the configuration structure parsed from llpkg.cfg files.
 type LLPkgConfig struct {
+	Type     string         `json:"type,omitempty"` // "python" for Python packages, empty for C/C++
 	Upstream UpstreamConfig `json:"upstream"`
 }
 
@@ -41,6 +43,14 @@ func NewUpstreamFromConfig(upstreamConfig UpstreamConfig) (*upstream.Upstream, e
 	case "conan":
 		return &upstream.Upstream{
 			Installer: conan.NewConanInstaller(upstreamConfig.Installer.Config),
+			Pkg: upstream.Package{
+				Name:    upstreamConfig.Package.Name,
+				Version: upstreamConfig.Package.Version,
+			},
+		}, nil
+	case "pip":
+		return &upstream.Upstream{
+			Installer: pip.NewPipInstaller(upstreamConfig.Installer.Config),
 			Pkg: upstream.Package{
 				Name:    upstreamConfig.Package.Name,
 				Version: upstreamConfig.Package.Version,

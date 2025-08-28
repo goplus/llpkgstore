@@ -26,6 +26,14 @@ func WithConanSerializer() Options {
 	}
 }
 
+func WithPipSerializer() Options {
+	return func(cb *CmdBuilder) {
+		cb.serializer = func(k, v string) string {
+			return fmt.Sprintf(`--%s=%s`, k, v)
+		}
+	}
+}
+
 func NewCmdBuilder(opts ...Options) *CmdBuilder {
 	c := &CmdBuilder{}
 
