@@ -631,9 +631,14 @@ func (d *DefaultClient) Postprocessing() error {
 		return err
 	}
 
-	// write it to llpkgstore.json
-	ver := versions.Read("llpkgstore.json")
-	ver.Write(clib, cfg.Upstream.Package.Version, mappedVersion)
+	// write it to llpkgstore.json (skip for Python packages)
+	if cfg.Type != "python" {
+		ver := versions.Read("llpkgstore.json")
+		ver.Write(clib, cfg.Upstream.Package.Version, mappedVersion)
+		fmt.Printf("Updated llpkgstore.json for C++ package: %s\n", clib)
+	} else {
+		fmt.Printf("Skipping llpkgstore.json update for Python package: %s\n", clib)
+	}
 
 	// 根据包类型确定标签格式
 	tagName := version // 默认使用原始版本格式
