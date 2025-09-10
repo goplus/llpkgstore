@@ -643,8 +643,8 @@ func (d *DefaultClient) Postprocessing() error {
 	// 根据包类型确定标签格式
 	tagName := version // 默认使用原始版本格式
 	if cfg.Type == "python" {
-		// 对于Python包，使用Python_package/包名/版本格式
-		tagName = fmt.Sprintf("Python_package/%s/%s", clib, mappedVersion)
+		// 对于Python包，使用py/包名/版本格式
+		tagName = fmt.Sprintf("py/%s/%s", clib, mappedVersion)
 		fmt.Printf("Python package detected, using tag format: %s\n", tagName)
 	} else {
 		fmt.Printf("C++ package detected, using tag format: %s\n", tagName)
