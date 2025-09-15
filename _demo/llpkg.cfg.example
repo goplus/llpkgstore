@@ -1,0 +1,20 @@
+{
+  "type": "python",
+  "upstream": {
+    "installer": {
+      "name": "pip",
+      "config": {
+        "options": ""
+      }
+    },
+    "package": {
+      "name": "numpy",
+      "version": "1.26.4"
+    }
+  },
+  "llpyg": {
+    "output_dir": "./generated",
+    "mod_name": "github.com/PengPengPeng717/llpkg/numpy",
+    "mod_depth": 2
+  }
+} 

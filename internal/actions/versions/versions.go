@@ -2,8 +2,8 @@ package versions
 
 import (
 	"encoding/json"
+	"fmt"
 	"io"
-	"log"
 	"os"
 	"slices"
 
@@ -27,7 +27,8 @@ type Versions struct {
 //	elem: Version to append
 func appendVersion(arr []string, elem string) []string {
 	if slices.Contains(arr, elem) {
-		log.Fatalf("version %s has already existed", elem)
+		fmt.Printf("Warning: version %s already exists, skipping\n", elem)
+		return arr
 	}
 	return append(arr, elem)
 }

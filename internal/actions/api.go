@@ -9,6 +9,7 @@ import (
 	"mime"
 	"net/http"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -471,7 +472,9 @@ func (d *DefaultClient) uploadArtifactsToRelease(release *github.RepositoryRelea
 	}
 
 	if artifacts.GetTotalCount() == 0 {
-		return nil, errors.New("actions: no artifact found")
+		// No artifacts found, return empty result instead of error
+		// This allows postprocessing to work even when artifacts are not available
+		return []*os.File{}, nil
 	}
 
 	errGroup, _ := errgroup.WithContext(context.TODO())
@@ -628,20 +631,43 @@ func (d *DefaultClient) Postprocessing() error {
 		return err
 	}
 
-	// write it to llpkgstore.json
-	ver := versions.Read("llpkgstore.json")
-	ver.Write(clib, cfg.Upstream.Package.Version, mappedVersion)
-
-	if hasTag(version) {
-		return fmt.Errorf("actions: tag has already existed")
+	// write it to llpkgstore.json (skip for Python packages)
+	if cfg.Type != "python" {
+		ver := versions.Read("llpkgstore.json")
+		ver.Write(clib, cfg.Upstream.Package.Version, mappedVersion)
+		fmt.Printf("Updated llpkgstore.json for C++ package: %s\n", clib)
+	} else {
+		fmt.Printf("Skipping llpkgstore.json update for Python package: %s\n", clib)
 	}
 
-	if err := d.createTag(version, sha); err != nil {
+	// Determine tag format based on package type
+	tagName := version // Default to original version format
+	if cfg.Type == "python" {
+		// For Python packages, use py/package_name/version format
+		tagName = fmt.Sprintf("py/%s/%s", clib, mappedVersion)
+		fmt.Printf("Python package detected, using tag format: %s\n", tagName)
+	} else {
+		fmt.Printf("C++ package detected, using tag format: %s\n", tagName)
+	}
+
+	if hasTag(tagName) {
+		fmt.Printf("Warning: tag %s already exists, will be overwritten\n", tagName)
+		// Delete existing local tag
+		if err := exec.Command("git", "tag", "-d", tagName).Run(); err != nil {
+			fmt.Printf("Warning: failed to delete local tag %s: %v\n", tagName, err)
+		}
+		// Delete remote tag
+		if err := exec.Command("git", "push", "origin", ":"+tagName).Run(); err != nil {
+			fmt.Printf("Warning: failed to delete remote tag %s: %v\n", tagName, err)
+		}
+	}
+
+	if err := d.createTag(tagName, sha); err != nil {
 		return err
 	}
 
 	// create a release
-	release, err := d.createReleaseByTag(version)
+	release, err := d.createReleaseByTag(tagName)
 	if err != nil {
 		return err
 	}
